@@ -4,7 +4,7 @@ OpenLayers.Control.LayerTree = OpenLayers.Class(OpenLayers.Control.LayerSwitcher
 
     emptyTitle:'',
 
-    baselayerData: [],
+    baselayerData:[],
     overlayData:[],
 
     initialize: function(options) {
@@ -25,7 +25,12 @@ OpenLayers.Control.LayerTree = OpenLayers.Class(OpenLayers.Control.LayerSwitcher
             var layer = this.map.layers[i];
             layer.events.register('loadstart', {layer:layer,control:this}, this.startLoading);
             layer.events.register('loadend', {layer:layer,control:this}, this.endLoading);
-            if(layer.displayInLayerSwitcher) this.initTreeData(layer);
+            if (layer.mapset_single) {
+                this.initSingleMapsetTree(layer);
+            }
+            else if(layer.displayInLayerSwitcher) {
+                this.initTreeData(layer);
+            }
         }
 
     },
@@ -495,6 +500,47 @@ OpenLayers.Control.LayerTree = OpenLayers.Class(OpenLayers.Control.LayerSwitcher
 
         thNode.children.push(chNode);    
 
+    },
+    
+    initSingleMapsetTree: function(oLayer)
+    {
+        var layerTree = this.overlayData;
+        var fTypes = [];
+        //chNode = {id:oLayer.id, text:oLayer.title, state:'closed', iconCls:oLayer.isBaseLayer?"overlay-param":"overlay", attributes:{layer:oLayer}};
+        if(!oLayer.isBaseLayer && oLayer.theme != oLayer.title) chNode.checked = oLayer.visibility;
+        if(oLayer.theme != oLayer.title) fTypes = this.getFetureTypes(oLayer.name); //NO SINGOLO TEMA
+
+        //SE IL LAYER PREVEDE LO SPLIT DEI SINGOLI MAPLAYER LI AGGIUNGO E ASSOCIO LA CORRISPONDENTE FEATURETYPE SE PRESENTE 
+        if(typeof(oLayer.nodes)!='undefined') {
+            for (var i = 0; i < oLayer.nodes.length; i++) {
+                //layerParam = oLayer.nodes[j].layer;
+                themeObj = oLayer.nodes[i];
+                thNode = this.getThemeNode(layerTree,themeObj.name);                
+                for (var j = 0; j < themeObj.nodes.length; j++) {
+                    layerGroupObj = themeObj.nodes[j];
+                    layerParam = layerGroupObj.layer;
+
+                    leafNode = {id:oLayer.id + "_" + i + "_" + j, text:layerGroupObj.title, iconCls:"overlay-param", attributes:{layer:oLayer, layerParam:layerParam}}
+                    if(typeof(layerGroupObj.visibility)) leafNode.checked = layerGroupObj.visibility;
+                    //if(oLayer.theme == oLayer.title) fTypes = this.getFetureTypes(layerParam);  //SINGOLO TEMA
+                    //if((fTypes.length > 0 && oLayer.theme == oLayer.title) || (fTypes.length > 0 && fTypes[0].typeName == layerParam)){
+                    //    leafNode.queryable = true;
+                        //leafNode.iconCls = "queryable";
+                    //    leafNode.attributes.featureTypes = fTypes;
+                    //}
+                    if(layerGroupObj.nodes){ //3 livelli su tema unico
+                        leafNode.iconCls = "overlay";
+                        leafNode.children = [];
+                        for (var k = 0; k < layerGroupObj.nodes.length; k++) {
+                            layerObj = layerGroupObj.nodes[k];
+                            leaf_leafNode = {id:oLayer.id + "_" + i + "_" + j + "_" + k, text:layerObj.title, iconCls:"overlay-param", attributes:{layer:oLayer, layerParam:layerObj.layer}}
+                            leafNode.children.push(leaf_leafNode);
+                        }
+                    }
+                    thNode.children.push(leafNode);
+                }; 
+            }
+        }
     },
 
     CLASS_NAME: "OpenLayers.Control.LayerTree"

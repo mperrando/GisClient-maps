@@ -979,7 +979,7 @@ var initMap = function(){
     });
     $('a[href="#layerlegend"]').click(function() {
         if(!layerLegend.loaded) {
-            layerLegend.load();
+            layerLegend.load();initMap
         }
     });
 

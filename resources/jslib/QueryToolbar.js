@@ -110,6 +110,12 @@ OpenLayers.GisClient.queryToolbar = OpenLayers.Class(OpenLayers.Control.Panel,{
         }
     },
 
+    setMap: function(map) {
+        OpenLayers.Control.Panel.prototype.setMap.apply(this, arguments);
+        this.map.events.register("zoomend", this, this.redraw);
+    },
+    
+    
     //boh non so se inizializzare qui oppure passare la wfscache già pronta ...  da vedere per ora scelgo la 2
     initWfsCache:function(){//NON USATA INIZIALIZZO FUORI
         var layer;
