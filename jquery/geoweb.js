@@ -1,3 +1,4 @@
+window.Extensions = {};
 var GisClientMap; //POI LO TOGLIAMO!!!!
 var mycontrol,ismousedown;
 
@@ -19,6 +20,19 @@ function adjustPanZoomBar(olControl, toolOffset){
         }
     }
 }
+
+window.Extensions["SideToolbar.Buttons"] = {
+  buttons: [],
+  addButton: function(name, buttonFunction) {
+    var b = {
+      name: name,
+      buttonFunction: buttonFunction,
+      iconName: ''
+    };
+    this.buttons.push(b)
+    return b;
+  }
+};
 
 var sidebarPanel = {
     closeTimeout: null,
@@ -161,6 +175,18 @@ var customCreateControlMarkup = function(control) {
     return button;
 };
 
+createToolbarExtensiosButtons = function() {
+  var ext = window.Extensions["SideToolbar.Buttons"];
+  var result = [];
+  ext.buttons.forEach(function(b) {
+    var olb = new OpenLayers.Control.Button({
+      iconclass:"glyphicon-white glyphicon-" + b.iconName, title:"Redline",
+      trigger: b.buttonFunction
+    });
+    result.push(olb);
+  });
+  return result;
+}
 
 var initMap = function(){
     var map=this.map;
@@ -1216,8 +1242,8 @@ var initMap = function(){
                     sidebarPanel.handleEvent = false;
                 }
             }      
-        }),
-        
+        })].concat(
+          createToolbarExtensiosButtons()).concat([
         pSelect,
 
         btnPrint = new OpenLayers.Control.PrintMap({
@@ -1442,7 +1468,7 @@ var initMap = function(){
 
         })
 */
-    ]);
+    ]));
 
     sideBar.defaultControl = sideBar.controls[2];
     map.addControl(sideBar);

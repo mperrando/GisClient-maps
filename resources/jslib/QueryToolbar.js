@@ -1,3 +1,16 @@
+$(function(){
+  window.Extensions["QueryToolbar.Actions"] = {
+    actions: [],
+    addAction: function(name, buttonFunction, callbackFunction) {
+      this.actions.push({
+        name: name,
+        buttonFunction: buttonFunction,
+        callbackFunction: callbackFunction
+      })
+    }
+  };
+});
+
 OpenLayers.GisClient.queryToolbar = OpenLayers.Class(OpenLayers.Control.Panel,{
     
     // **** baseUrl - Gisclient service URL
@@ -543,6 +556,7 @@ OpenLayers.GisClient.queryToolbar = OpenLayers.Class(OpenLayers.Control.Panel,{
         htmlTable += '</span><table class="featureTypeData"><thead><tr>' + htmlHeaders + '</tr><tbody>';
         for (var j = 0; j < fLen; j++) {
             values = '<td feature-col="Azioni"><a class="olControlButtonItemInactive olButton olLikeButton" href="#" featureType="'+featureType.typeName+'" featureId="'+featureType.features[j].id+'" action="zoom"  buffer="'+(featureType.zoomBuffer || 0)+'" title="Zoom" style="margin:0"><span class="glyphicon-white glyphicon-search"></span></a>';
+            values += this.buildActions(featureType, featureType.features[j]);
             if(featureType.relations) {
                 for(var f = 0; f < featureType.relations.length; f++) {
                     relation = featureType.relations[f];
@@ -573,6 +587,15 @@ OpenLayers.GisClient.queryToolbar = OpenLayers.Class(OpenLayers.Control.Panel,{
         */
     },
     
+    buildActions: function(featureType, feature) {
+        var ext = window.Extensions["QueryToolbar.Actions"];
+        var result = '';
+        ext.actions.forEach(function(a) {
+          result += a.buttonFunction(featureType, feature);
+        });
+        return result;
+    },
+
     getFieldByName: function(featureType, fieldName) {
         var field = null,
             len = featureType.properties.length, property, i;
@@ -824,6 +847,12 @@ popup.autoSize = true;
                                 me.exportFeatureType(featureType, 'pdf');
                             break;
                          
+                            default:
+                              var ext = window.Extensions["QueryToolbar.Actions"];
+                              ext.actions.forEach(function(a) {
+                                if ( a.name == action )
+                                  a.callbackFunction(featureType, featureId);
+                              });
                         }
                     }
                     
