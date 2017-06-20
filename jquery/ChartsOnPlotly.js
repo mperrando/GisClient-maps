@@ -1,11 +1,19 @@
-Chart = function(getUrl, ids, opts) {
+var ChartDataProvider = function(getUrl) {
+  var me = this;
+
+  me.getChartData = function(ids, from, to, callback) {
+    Plotly.d3.json(getUrl(ids, from, to), callback);
+  }
+}
+
+Chart = function(getChartData, opts) {
   var me = this,
     view = document.createElement("div"),
     _to = new Date().getTime(),
     _from = new Date(),
-    ids = ids;
-  if(opts==undefined)
-    opts = {}
+    ids = [];
+  if ( opts == undefined )
+    opts = {};
   _from.setDate(_from.getDate() -1);
   _from = _from.getTime();
   //$(view).css("padding", '10');
@@ -22,30 +30,30 @@ Chart = function(getUrl, ids, opts) {
     plot_bgcolor: '#fafafa'
   };
 
-  var data = ids.map(function(id){ return {x: [], y: [], type: 'scatter'}; });
 
-  me.url = function() {
-    return getUrl(ids, _from, _to);
-  };
+  me.setIds = function(ids) {
+    this.ids = ids;
+    var data = ids.map(function(id){ return {x: [], y: [], type: 'scatter'}; });
+    Plotly.newPlot(view, data, layout, {showLink: false, displayModeBar: false});
+    view.on('plotly_relayout', function(eventdata){
+      //console.log("relayout");
+      if(me.rangeChanged != undefined)
+        var from  = eventdata['xaxis.range[0]'],
+          to = eventdata['xaxis.range[1]'];
+        if(from || to) {
+          from  = new Date(from).getTime();
+          to  = new Date(to).getTime();
+          me.rangeChanged(from || _from, to || _to);
+        }
+    });
 
-  Plotly.newPlot(view, data, layout, {showLink: false, displayModeBar: false});
-
-  view.on('plotly_relayout', function(eventdata){
-    //console.log("relayout");
-    if(me.rangeChanged != undefined)
-      var from  = eventdata['xaxis.range[0]'],
-        to = eventdata['xaxis.range[1]'];
-      if(from || to) {
-        from  = new Date(from).getTime();
-        to  = new Date(to).getTime();
-        me.rangeChanged(from || _from, to || _to);
-      }
-  });
+    me.reload();
+  }
 
   me.reload = function() {
-    Plotly.d3.json(me.url(), function(series) {
+    getChartData(this.ids, _from, _to, function(series) {
       if ( !series )
-        reutrn;
+        return;
       for ( var i = 0, len = series.length; i < len; i++ ) {
         var serie = series[i];
         Plotly.restyle(view, {
@@ -84,6 +92,4 @@ Chart = function(getUrl, ids, opts) {
   me.refresh = function() {
     Plotly.Plots.resize(view);
   };
-
-  me.reload();
 }

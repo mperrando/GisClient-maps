@@ -130,9 +130,9 @@ function SerieChooser(callback) {
   }
 }
 
-function ChartPanel(getUrl, ids, opts) {
+function ChartPanel(getUrl, opts) {
   var me = this;
-  var chart = new Chart(getUrl, ids, opts),
+  var chart = new Chart(new ChartDataProvider(getUrl).getChartData, opts),
       view = document.createElement("div"),
       rightToolbarPanel = new RightToolbarPanel();
 
@@ -146,21 +146,29 @@ function ChartPanel(getUrl, ids, opts) {
     }
   };
 
+  me.setIds = function(ids) {
+    chart.setIds(ids);
+  }
+
   me.view = view;
   me.refresh = chart.refresh;
   me.getTimeRange = chart.getTimeRange;
   me.setTimeRange = chart.setTimeRange;
 }
 
-function QuickWorkspace(urlProvider, serie) {
+function QuickWorkspace(urlProvider) {
   var me = this;
-  var chart = new ChartPanel(urlProvider.urlForSerie, [serie.id]);
+  var chart = new ChartPanel(urlProvider.urlForSerie);
   var view = document.createElement("div"),
     timeControlBar = new TimeControlBar(chart.setTimeRange, chart.getTimeRange);
   $(view).addClass("quickWorkspace");
   //$(view).css("padding", 20);
   view.appendChild(timeControlBar.view());
   view.appendChild(chart.view);
+
+  me.setSerie = function(serieId) {
+    chart.setIds([serieId]);
+  }
 
   me.getView = function() {
     return view;
@@ -190,7 +198,8 @@ function ChartsPanel(getUrl) {
   }
 
   me.addChart = function(ids) {
-    var chart = new ChartPanel(getUrl, ids);
+    var chart = new ChartPanel(getUrl);
+    chart.setIds(ids);
     charts.push(chart);
     chart.rangeChanged = rangeChangedOnChart;
     view.appendChild(chart.view);
@@ -363,22 +372,31 @@ function createVerticalScrollPanel() {
 
 window.Extensions["FeatureChart.Ready"] = [];
 
-function installFeatureButton(urlProvider, onChartReady) {
+function installFeatureButton(urlProvider) {
+  var me = this;
   var measuresPopup = createFullWindownBlackPanelWithCloseAndContent();
   var content = createVerticalScrollPanel()
   measuresPopup.element().appendChild(content);
 
-  var openSerieInQuickWorkspace = function(serie) {
-    var ws = new QuickWorkspace(urlProvider, serie);
-    content.appendChild(ws.getView());
+  var makeWs = function() {
+    me.ws = new QuickWorkspace(urlProvider);
     var exts = window.Extensions["FeatureChart.Ready"];
     for(var i = 0; i < exts.length; i++)
-      exts[i](measuresPopup, ws.chart, serie);
+      exts[i](measuresPopup, ws.chart, function() { return me.serie; });
+  }
+
+  var openSerieInQuickWorkspace = function(serie) {
+    if(me.ws == undefined)
+      makeWs();
+
+    content.appendChild(me.ws.getView());
+
+    me.serie = serie;
+    ws.setSerie(serie);
     ws.refresh();
   }
 
   var serieChooser = new SerieChooser(function(serie) {
-    emptyContent(content);
     openSerieInQuickWorkspace(serie);
   });
 
@@ -463,6 +481,13 @@ function SearchPanel(urlProvider) {
   view.appendChild(searchForm.view());
   view.appendChild(searchResults);
 
+  var makeWs = function() {
+    me.ws = new QuickWorkspace(urlProvider);
+    var exts = window.Extensions["SearchChart.Ready"];
+    for(var i = 0; i < exts.length; i++)
+      exts[i](me.ws.chart, function() { return me.serie; });
+  }
+
   me.view = function() { return view; }
 
   me.execute = function() {
@@ -481,13 +506,13 @@ function SearchPanel(urlProvider) {
   }
 
   openSerie = function(serie) {
-    emptyContent(graphContainer);
-    var ws = new QuickWorkspace(urlProvider, serie);
-    graphContainer.appendChild(ws.getView());
-    var exts = window.Extensions["SearchChart.Ready"];
-    for(var i = 0; i < exts.length; i++)
-      exts[i](ws.chart, serie);
-    ws.refresh();
+    if(me.ws==undefined)
+      makeWs();
+
+    graphContainer.appendChild(me.ws.getView());
+    me.serie = serie;
+    me.ws.setSerie(serie);
+    //me.ws.refresh();
   }
 
   searchForm.onSubmit = me.execute;
@@ -571,15 +596,16 @@ function popupAddSerieToWorkspace(urlProvider, serie, doneCallback) {
 
 function installAddSerieToWorkspace(workspacesPopup, workspacesPanel, urlProvider) {
   addSerie = function(serie, workspaceId, chartId) {
-    alert("Adding to ws " + workspaceId + " chart " + chartId);
+    alert("Adding serie " + serie + " to ws " + workspaceId + " chart " + chartId);
     if ( workspaceId != undefined )
       return workspaceId;
     else
       return 9999;
   }
 
-  window.Extensions["FeatureChart.Ready"].push(function(popup, chart, serie) {
+  window.Extensions["FeatureChart.Ready"].push(function(popup, chart, getSerie) {
     chart.toolbar.add("...", function() {
+      var serie = getSerie();
       popupAddSerieToWorkspace(urlProvider, serie, function(workspaceId, chartId) {
         var targetWs = addSerie(serie, workspaceId, chartId);
         popup.hide();
@@ -590,8 +616,9 @@ function installAddSerieToWorkspace(workspacesPopup, workspacesPanel, urlProvide
     });
   });
 
-  window.Extensions["SearchChart.Ready"].push(function(chart, serie) {
+  window.Extensions["SearchChart.Ready"].push(function(chart, getSerie) {
     chart.toolbar.add("...", function() {
+      var serie = getSerie();
       popupAddSerieToWorkspace(urlProvider, serie, function(workspaceId, chartId) {
         var targetWs = addSerie(serie, workspaceId, chartId);
         workspacesPanel.openWorkspace(targetWs);
