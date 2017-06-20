@@ -192,8 +192,8 @@ function ChartsPanel(getUrl) {
     }
   }
 
-  me.setTimeRange = function() {
-    charts[0].getTimeRange();
+  me.getTimeRange = function() {
+    return charts[0].getTimeRange();
   }
 };
 
