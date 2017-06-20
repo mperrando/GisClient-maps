@@ -6,6 +6,19 @@ function simpleLink(text, callback) {
   return result;
 }
 
+function centralWindow(title) {
+  var me = this,
+      view = document.createElement("div");
+  $(view).css("margin", "auto");
+  $(view).css("margin-top", 50);
+  $(view).css("padding", 20);
+  $(view).css("width", "50%");
+  $(view).css("min-width", "400");
+  $(view).css("background", "white");
+  view.innerHTML = "<h3>" + title  +"</h3>";
+  return view;
+}
+
 function indexForOptionWithValue(select, value) {
   for(var i = 0; i < select.length; i++) {
     var o = select.options[i];
@@ -96,16 +109,19 @@ function TimeControlBar(onChange, getCurrent) {
 
 function SerieChooser(callback) {
   var me = this,
-      view = document.createElement("div");
+      view = centralWindow("Scegli la misura da visualizzare"),
+      list = document.createElement("div");
+  view.appendChild(list);
+
   me.setSeries = function(series) {
-    emptyContent(view);
+    emptyContent(list);
     series.forEach(function(serie){
       var v = document.createElement("div"),
           btn = simpleLink(serie.name, function() {
             callback(serie);
           });
       v.appendChild(btn);
-      view.appendChild(v);
+      list.appendChild(v);
     });
   }
 
@@ -492,15 +508,7 @@ function installSideBarButton(workspacesPanel, workspacesPopup) {
 
 function AddSerieToWorkspace(urlProvider, serie, doneCallback, cancelCallback) {
   var me = this,
-      view = document.createElement("div");
-  $(view).css("margin", "auto");
-  $(view).css("margin-top", 50);
-  $(view).css("padding", 20);
-  $(view).css("width", "50%");
-  $(view).css("min-width", "400");
-  $(view).css("background", "white");
-  view.innerHTML = "<h1>Aggiungi a workspce</h1>";
-
+      view = centralWindow("Aggiungi a workspce");
 
   var workspaceSelect = document.createElement("select"),
       chartSelect = document.createElement("select");
