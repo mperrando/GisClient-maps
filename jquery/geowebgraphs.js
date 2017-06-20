@@ -83,7 +83,7 @@ function TimeControlBar(onChange, getCurrent) {
     var current = getCurrent(),
         from = current[0],
         to = current[1]
-        span = to - from;
+        span = (to - from) / 2;
     onChange(from - span, to - span);
   }));
   view.appendChild(simpleLink("ADESSO", function() {
@@ -98,7 +98,7 @@ function TimeControlBar(onChange, getCurrent) {
     var current = getCurrent(),
         from = current[0],
         to = current[1]
-        span = to - from;
+        span = (to - from) / 2;
     onChange(from + span, to + span);
   }));
 
