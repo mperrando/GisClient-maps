@@ -19,9 +19,13 @@ Chart = function(getChartData, opts) {
   //$(view).css("padding", '10');
   $(view).addClass("plotly-chart chart");
 
+  var height = function() {
+    return opts.height || 200;
+  }
+
   var layout = {
     autosize: true,
-    height: opts.height || 200,
+    height: height(),
     margin: {l: 80, r: 30, b: 40, t: 20},
     xaxis: {
       type: "date"
@@ -69,6 +73,19 @@ Chart = function(getChartData, opts) {
     me.refresh();
   });
 
+  me.setTitle = function(title) {
+    var props = {
+      title: title
+    };
+    if(title != undefined) {
+      props['margin'] = { t: 80 };
+      props['height'] = height() + 60;
+    }
+    else {
+      props['height'] = height();
+    }
+    Plotly.relayout(view, props)
+  }
 
   me.setTimeRange = function(from, to) {
     _from = from;

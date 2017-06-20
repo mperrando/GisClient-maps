@@ -51,6 +51,8 @@ function RightToolbarPanel(size) {
   view.appendChild(toolbar);
   view.appendChild(content);
   $(toolbar).css("float", "right");
+  $(toolbar).css("background", "white");
+  $(toolbar).css("padding-left", 10);
 
   me.view = view;
   me.content = content;
@@ -154,6 +156,7 @@ function ChartPanel(getUrl, opts) {
   me.refresh = chart.refresh;
   me.getTimeRange = chart.getTimeRange;
   me.setTimeRange = chart.setTimeRange;
+  me.setTitle = chart.setTitle;
 }
 
 function QuickWorkspace(urlProvider) {
@@ -172,6 +175,10 @@ function QuickWorkspace(urlProvider) {
 
   me.getView = function() {
     return view;
+  }
+
+  me.setTitle = function(title) {
+    chart.setTitle(title);
   }
 
   me.refresh = function() {
@@ -392,8 +399,9 @@ function installFeatureButton(urlProvider) {
     content.appendChild(me.ws.getView());
 
     me.serie = serie;
-    ws.setSerie(serie);
-    ws.refresh();
+    me.ws.setSerie(serie.id);
+    me.ws.setTitle(serie.name);
+    //me.ws.refresh();
   }
 
   var serieChooser = new SerieChooser(function(serie) {
@@ -485,7 +493,7 @@ function SearchPanel(urlProvider) {
     me.ws = new QuickWorkspace(urlProvider);
     var exts = window.Extensions["SearchChart.Ready"];
     for(var i = 0; i < exts.length; i++)
-      exts[i](me.ws.chart, function() { return me.serie; });
+      exts[i](me.ws.chart, function() { return me.serieId; });
   }
 
   me.view = function() { return view; }
@@ -501,7 +509,7 @@ function SearchPanel(urlProvider) {
       l.style = "display:block";
       l.innerHTML = item.name;
       searchResults.appendChild(l);
-      l.onclick = function() { openSerie(item.id); }
+      l.onclick = function() { openSerie(item); }
     });
   }
 
@@ -510,8 +518,9 @@ function SearchPanel(urlProvider) {
       makeWs();
 
     graphContainer.appendChild(me.ws.getView());
-    me.serie = serie;
-    me.ws.setSerie(serie);
+    me.serieId = serie.id;
+    me.ws.setSerie(serie.id);
+    me.ws.setTitle(serie.name);
     //me.ws.refresh();
   }
 
