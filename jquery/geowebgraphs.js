@@ -469,16 +469,14 @@ function SearchPanel(urlProvider) {
     emptyContent(graphContainer);
     emptyContent(searchResults);
     var text = searchForm.text();
-    $.getJSON(urlProvider.getSearchUrl(text), function(data) {
-      for(var i = 0; i < data.length; i++) {
-        var l = document.createElement("a");
-        l.href = '#';
-        l.style = "display:block";
-        l.innerHTML = data[i].name;
-        var serie = data[i].id;
-        searchResults.appendChild(l);
-        l.onclick = function() { openSerie(serie); }
-      }
+
+    ajaxForEachElement(urlProvider.getSearchUrl(text), function(item) {
+      var l = document.createElement("a");
+      l.href = '#';
+      l.style = "display:block";
+      l.innerHTML = item.name;
+      searchResults.appendChild(l);
+      l.onclick = function() { openSerie(item.id); }
     });
   }
 
