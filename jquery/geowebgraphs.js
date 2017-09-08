@@ -43,6 +43,64 @@ function installCallbackOnOptions(select) {
   f();
 }
 
+function FormLabel(text) {
+  var me = this,
+      view = document.createElement("div"),
+      label = document.createElement("label");
+  me.view = view;
+  view.appendChild(label);
+  label.innerText = text;
+}
+
+function DateField() {
+  var me = this,
+      view = document.createElement('div'),
+      current = undefined;
+  $(view).addClass("easyui-calendar");
+  $(view).calendar({onSelect: function(date){
+    current = date;
+  }});
+  //view.style="width:250px;height:250px;";
+  me.view = view;
+
+  me.set = function(val) {
+    $(view).calendar({current: val});
+    current = val;
+  }
+
+  me.get = function() {
+    return current;
+  }
+}
+
+function StartEndDatesPanel(okCallback) {
+  var me = this,
+      view = document.createElement("div"),
+      start = new DateField(),
+      end = new DateField();
+  me.view = view;
+  view.appendChild(new FormLabel("Inizio").view);
+  view.appendChild(start.view);
+  view.appendChild(new FormLabel("Fine").view);
+  view.appendChild(end.view);
+
+  me.getStart = function() {
+    return start.get();
+  }
+
+  me.setStart = function(val) {
+    start.set(val);
+  }
+
+  me.getEnd = function() {
+    return end.get();
+  }
+
+  me.setEnd = function(val) {
+    end.set(val);
+  }
+}
+
 function RightToolbarPanel(size) {
   var me = this,
       view = document.createElement("div"),
@@ -102,6 +160,28 @@ function TimeControlBar(onChange, getCurrent) {
         to = current[1]
         span = (to - from) / 2;
     onChange(from + span, to + span);
+  }));
+  view.appendChild(simpleLink("Imposta", function() {
+    var current = getCurrent(),
+        from = current[0],
+        to = current[1];
+    var popup = window.PopupService.createModalPopup(),
+        content = centralWindow("Imposta orizzonte temporale"),
+        startEnd = new StartEndDatesPanel(),
+        closeBtn = simpleLink("Cancel", function() {
+          popup.hide();
+        }),
+        okBtn  = simpleLink("OK", function(){
+          onChange(startEnd.getStart().getTime(), startEnd.getEnd().getTime());
+          popup.hide();
+        });
+    popup.element().appendChild(content)
+    content.appendChild(startEnd.view);
+    content.appendChild(okBtn)
+    content.appendChild(closeBtn)
+    startEnd.setStart(new Date(from));
+    startEnd.setEnd(new Date(to));
+    popup.show();
   }));
 
   me.view = function() {
