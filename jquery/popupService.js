@@ -5,7 +5,7 @@ window.PopupService = {
     var e = document.createElement('div');
     e.innerHTML = "";
     var jqe = $(e);
-    jqe.attr('style', "position: fixed; left:0; right: 0; top:0; bottom: 0; background: rgba(0,0,0,.8);");
+    jqe.attr('style', "overflow-y: scroll; position: fixed; left:0; right: 0; top:0; bottom: 0; background: rgba(0,0,0,.8);");
     return {
       element: function() {
         return e;
