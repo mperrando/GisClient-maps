@@ -18,6 +18,7 @@ Chart = function(getChartData, opts) {
   _from = _from.getTime();
   //$(view).css("padding", '10');
   $(view).addClass("plotly-chart chart");
+  me.rangeChanged = undefined;
 
   var height = function() {
     return opts.height || 200;
@@ -43,8 +44,9 @@ Chart = function(getChartData, opts) {
       //console.log("relayout");
       if(me.rangeChanged != undefined)
         var from  = eventdata['xaxis.range[0]'],
-          to = eventdata['xaxis.range[1]'];
-        if(from || to) {
+          to = eventdata['xaxis.range[1]'],
+          autorange = !!eventdata['xaxis.autorange'];
+        if(autorange || from || to) {
           from  = new Date(from).getTime();
           to  = new Date(to).getTime();
           me.rangeChanged(from || _from, to || _to);
@@ -99,8 +101,6 @@ Chart = function(getChartData, opts) {
   me.getTimeRange = function() {
     return [_from, _to];
   }
-
-  me.rangeChanged = me.setTimeRange;
 
   me.view = function() {
     return view;

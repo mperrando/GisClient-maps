@@ -1,3 +1,24 @@
+Array.prototype.move = function(from,to){
+  this.splice(to,0,this.splice(from,1)[0]);
+  return this;
+};
+
+function moveInElement(e, from, to) {
+  if ( from == to )
+    return;
+  if ( from < to )
+    return moveInElement(e, to, from);
+  var nodes = e.childNodes;
+  var append = to == nodes.length;
+  var target = nodes[to];
+  var moving = e.removeChild(nodes[from]);
+  if ( append ) {
+    e.appendChild(moving);
+  } else {
+    e.insertBefore(moving, target);
+  }
+}
+
 function simpleLink(text, callback) {
   var result = document.createElement("a");
   result.href = "#";
@@ -52,7 +73,34 @@ function FormLabel(text) {
   label.innerText = text;
 }
 
-function DateField() {
+function DateFieldJqueruUI() {
+  var me = this,
+      view = document.createElement('div');
+  //view.style="width:250px;height:250px;";
+  me.view = view;
+
+  me.set = function(val) {
+    $(view).datepicker("setDate", val);
+  }
+
+  me.get = function() {
+    return $(view).datepicker("getDate");
+  }
+
+  me.setOnChange = function(cb) {
+    $(view).datepicker().on("change", cb);
+  }
+
+  me.setMinDate = function(d) {
+    $(view).datepicker("option", "minDate", d);
+  }
+
+  me.setMaxDate = function(d) {
+    $(view).datepicker("option", "maxDate", d);
+  }
+}
+
+function DateFieldEasyUI() {
   var me = this,
       view = document.createElement('div'),
       current = undefined;
@@ -71,18 +119,37 @@ function DateField() {
   me.get = function() {
     return current;
   }
+
+  me.setValidator = function(validator) {
+    $(view).calendar({validator: validator});
+  }
 }
 
-function StartEndDatesPanel(okCallback) {
+function StartEndDatesPanel() {
   var me = this,
       view = document.createElement("div"),
-      start = new DateField(),
-      end = new DateField();
+      start = new DateFieldJqueruUI(),
+      end = new DateFieldJqueruUI();
+  me.maxDate = null;
   me.view = view;
   view.appendChild(new FormLabel("Inizio").view);
   view.appendChild(start.view);
   view.appendChild(new FormLabel("Fine").view);
   view.appendChild(end.view);
+
+  var setRanges = function(){
+    var low = start.get();
+    if(low)
+      end.setMinDate(low);
+    if(me.maxDate)
+      end.setMinDate(me.maxDate);
+    var high = end.get();
+    if ( high || me.maxDate)
+      start.setMaxDate(new Date(Math.min(high, me.maxDate)));
+  };
+
+  start.setOnChange(setRanges);
+  end.setOnChange(setRanges);
 
   me.getStart = function() {
     return start.get();
@@ -90,6 +157,7 @@ function StartEndDatesPanel(okCallback) {
 
   me.setStart = function(val) {
     start.set(val);
+    setRanges();
   }
 
   me.getEnd = function() {
@@ -98,6 +166,7 @@ function StartEndDatesPanel(okCallback) {
 
   me.setEnd = function(val) {
     end.set(val);
+    setRanges();
   }
 }
 
@@ -175,6 +244,8 @@ function TimeControlBar(onChange, getCurrent) {
           onChange(startEnd.getStart().getTime(), startEnd.getEnd().getTime());
           popup.hide();
         });
+
+    startEnd.maxDate = new Date(); // now
     popup.element().appendChild(content)
     content.appendChild(startEnd.view);
     content.appendChild(okBtn)
@@ -218,13 +289,25 @@ function ChartPanel(getUrl, opts) {
       view = document.createElement("div"),
       rightToolbarPanel = new RightToolbarPanel();
 
+  view.style = "margin-bottom: 2px";
   rightToolbarPanel.content.appendChild(chart.view());
   view.appendChild(rightToolbarPanel.view);
 
   me.toolbar = {
     add: function(text, callback) {
       rightToolbarPanel.setSize(40);
-      rightToolbarPanel.toolbar.appendChild(simpleLink(text, callback));
+      var link = simpleLink(text, callback);
+      var wrap = document.createElement("div");
+      wrap.appendChild(link);
+      rightToolbarPanel.toolbar.appendChild(wrap);
+      return {
+        setVisible: function(val) {
+          if(val)
+            $(link).show();
+          else
+            $(link).hide();
+        }
+      };
     }
   };
 
@@ -237,6 +320,7 @@ function ChartPanel(getUrl, opts) {
   me.getTimeRange = chart.getTimeRange;
   me.setTimeRange = chart.setTimeRange;
   me.setTitle = chart.setTitle;
+  me.chart = chart;
 }
 
 function QuickWorkspace(urlProvider) {
@@ -272,22 +356,90 @@ function QuickWorkspace(urlProvider) {
 
 function ChartsPanel(getUrl) {
   var me = this,
-    charts = [];
+    charts = [],
+    syncingRanges;
   var view = document.createElement("div");
-  $(view).addClass("chartsWorkspace");
+  $(view).addClass("chartsPanel");
   me.view = function() {
     return view;
   }
 
-  rangeChangedOnChart = function(from, to) {
+  var rangeChangedOnChart = function(from, to) {
     if(me.rangeChanged != undefined)
       me.rangeChanged(from, to);
   }
 
-  me.addChart = function(ids) {
+  var createToolbar = function(c) {
+    var chart = c;
+    var calcVisibles = function() {
+      var idx = charts.indexOf(chart);
+      up.setVisible(idx > 0);
+      down.setVisible(idx < charts.length - 1);
+    }
+    var up = chart.toolbar.add("Su", function() {
+      moveUp(chart);
+    });
+    var down = chart.toolbar.add("Giù", function(){
+      moveDown(chart);
+    });
+    return {
+      calcVisibles: calcVisibles,
+    }
+  }
+
+  var moveDown = function(chart) {
+    var idx = charts.indexOf(chart);
+    if ( idx == charts.length - 1 )
+      return;
+    charts.move(idx, idx + 1);
+    moveInElement(view, idx, idx + 1);
+    eachChartDo(function(c){
+      c.moveToolbar.calcVisibles();
+    });
+    notifyPanelMoved();
+  }
+
+
+  var moveUp = function(chart) {
+    var idx = charts.indexOf(chart);
+    if ( idx == 0 )
+      return;
+    charts.move(idx, idx - 1);
+    moveInElement(view, idx, idx - 1);
+    eachChartDo(function(c){
+      c.moveToolbar.calcVisibles();
+    });
+    notifyPanelMoved();
+  }
+
+  var notifyPanelMoved = function() {
+    if ( me.onPanelMoved )
+      me.onPanelMoved();
+  }
+  var syncRanges = function(from, to, chart) {
+    if(syncingRanges)
+      return;
+    syncingRanges = true;
+    eachChartDo(function(c) {
+      if ( c == chart )
+        return;
+      c.setTimeRange(from, to);
+    });
+    syncingRanges = false;
+  }
+
+  me.addChart = function(ids, name) {
     var chart = new ChartPanel(getUrl);
     chart.setIds(ids);
     charts.push(chart);
+    chart.setTitle(name);
+    chart.chart.rangeChanged = function(from, to) {
+      syncRanges(from, to, chart);
+    };
+    chart.moveToolbar = createToolbar(chart);
+    eachChartDo(function(c){
+      c.moveToolbar.calcVisibles();
+    });
     chart.rangeChanged = rangeChangedOnChart;
     view.appendChild(chart.view);
     chart.refresh();
@@ -296,6 +448,12 @@ function ChartsPanel(getUrl) {
   me.clear = function() {
     charts = [];
     emptyContent(view);
+  }
+
+  var eachChartDo = function(f) {
+    for(var i = 0; i < charts.length; i++) {
+      f(charts[i]);
+    }
   }
 
   me.setTimeRange = function(from, to) {
@@ -307,6 +465,8 @@ function ChartsPanel(getUrl) {
   me.getTimeRange = function() {
     return charts[0].getTimeRange();
   }
+
+  me.onPanelMoved = undefined;
 };
 
 function ChartsWorkspace(urlProvider) {
@@ -314,14 +474,24 @@ function ChartsWorkspace(urlProvider) {
   var chartsPanel = new ChartsPanel(urlProvider.urlForSerie);
   var view = document.createElement("div"),
     workspaceData = null,
-    timeControlBar = new TimeControlBar(chartsPanel.setTimeRange, chartsPanel.getTimeRange);
+    timeControlBar = new TimeControlBar(chartsPanel.setTimeRange, chartsPanel.getTimeRange),
+    dirty = false;
 
-  $(view).addClass("normalWorkspace");
+  $(window).bind('beforeunload', function() {
+    if ( dirty )
+  	  return 'perdi tutto';
+  });
+
+  $(view).addClass("chartsWorkspace");
   //$(view).css("padding", 20);
   view.appendChild(timeControlBar.view());
   view.appendChild(chartsPanel.view());
 
   chartsPanel.rangeChanged = chartsPanel.setTimeRange;
+
+  chartsPanel.onPanelMoved = function() {
+    markDirty();
+  };
 
   me.view = function() {
     return view;
@@ -335,13 +505,23 @@ function ChartsWorkspace(urlProvider) {
     chartsPanel.addChart(ids);
   }
 
-  refreshGraphs = function() {
+  var refreshGraphs = function() {
     chartsPanel.clear();
     var graphs = workspaceData.graphs;
     for(var i = 0; i < graphs.length; i++) {
-      chartsPanel.addChart(graphs[i].series);
+      chartsPanel.addChart(graphs[i].series, graphs[i].name);
     }
-  }
+  },
+    markDirty = function() {
+      dirty = true;
+      calcCss();
+    }
+    calcCss = function() {
+      if ( dirty )
+        $(view).addClass("dirty")
+      else
+        $(view).removeClass("dirty")
+    };
 
   me.load = function(id) {
     $.getJSON(urlProvider.workspace(id), function(data) {
