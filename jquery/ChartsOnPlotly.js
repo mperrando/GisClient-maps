@@ -63,7 +63,7 @@ Chart = function(getChartData, opts) {
       for ( var i = 0, len = series.length; i < len; i++ ) {
         var serie = series[i];
         Plotly.restyle(view, {
-          x: [serie.x],
+          x: [serie.x.map(function(x) { return new Date(x); })],
           y: [serie.y],
           name: serie.name,
         }, i);

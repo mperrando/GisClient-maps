@@ -1,4 +1,6 @@
-Array.prototype.move = function(from,to){
+"use strict";
+
+Array.prototype.move = function(from,to) {
   this.splice(to,0,this.splice(from,1)[0]);
   return this;
 };
@@ -57,8 +59,12 @@ function ajaxForEachElement(url, callback) {
 }
 
 function installCallbackOnOptions(select) {
+  var lastIndex = null;
   var f = function() {
-    select.options[select.selectedIndex].execute();
+    if(select.options[select.selectedIndex].execute())
+      lastIndex = select.selectedIndex;
+    else
+      select.selectedIndex = lastIndex;
   };
   select.onchange = f;
   f();
@@ -211,7 +217,7 @@ function TimeControlBar(onChange, getCurrent) {
   view.appendChild(simpleLink("<", function() {
     var current = getCurrent(),
         from = current[0],
-        to = current[1]
+        to = current[1],
         span = (to - from) / 2;
     onChange(from - span, to - span);
   }));
@@ -479,7 +485,7 @@ function ChartsWorkspace(urlProvider) {
 
   $(window).bind('beforeunload', function() {
     if ( dirty )
-  	  return 'perdi tutto';
+  	  return 'confirm please';
   });
 
   $(view).addClass("chartsWorkspace");
@@ -512,25 +518,41 @@ function ChartsWorkspace(urlProvider) {
       chartsPanel.addChart(graphs[i].series, graphs[i].name);
     }
   },
-    markDirty = function() {
-      dirty = true;
-      calcCss();
-    }
-    calcCss = function() {
-      if ( dirty )
-        $(view).addClass("dirty")
-      else
-        $(view).removeClass("dirty")
-    };
+  markDirty = function() {
+    dirty = true;
+    calcCss();
+  },
+  calcCss = function() {
+    if ( dirty )
+      $(view).addClass("dirty")
+    else
+      $(view).removeClass("dirty")
+  },
+  confirmLoseData = function() {
+    return confirm("Procedendo si perdono i dati non salvati. Procedere?");
+  };
 
   me.load = function(id) {
+    if ( dirty && !confirmLoseData() )
+      return false;
     $.getJSON(urlProvider.workspace(id), function(data) {
       workspaceData = data;
+      dirty = false;
       refreshGraphs();
       if(workspaceData.timeRange != undefined) {
         chartsPanel.setTimeRange(timeRange.from, timeRange.to);
       }
     });
+    return true;
+  }
+
+  me.clear = function() {
+    if ( !dirty )
+      return true;
+    if ( !confirmLoseData() )
+      return false;
+    dirty = false;
+      return true;
   }
 }
 
@@ -561,20 +583,25 @@ function WorkspacesPanel(urlProvider, searchPanel) {
       var id = item.id;
       o.value = id;
       workspaceSelect.appendChild(o);
-      o.execute = function() { mustChangeWorkspace(id); }
+      o.execute = function() { return mustChangeWorkspace(id); }
     });
   };
 
   var mustOpenSearch = function() {
+    if(!chartsWorkspace.clear())
+      return false;
     emptyContent(workspacePanel);
     workspacePanel.appendChild(searchPanel.view());
     searchPanel.execute();
+    return true;
   }
 
   var mustChangeWorkspace = function(id) {
-    chartsWorkspace.load(id);
+    if(!chartsWorkspace.load(id))
+      return false;
     emptyContent(workspacePanel);
     workspacePanel.appendChild(chartsWorkspace.view());
+    return true;
   }
 
   var indexForWorkspace = function(id) {
@@ -589,10 +616,11 @@ function WorkspacesPanel(urlProvider, searchPanel) {
     var idx = indexForWorkspace(id);
     if ( idx != undefined ) {
       workspaceSelect.selectedIndex = idx;
-      mustChangeWorkspace(id);
+      return mustChangeWorkspace(id);
     }
     else {
       alert("Workspace not found: " + id);
+      return false;
     }
   }
 }
@@ -600,21 +628,6 @@ function WorkspacesPanel(urlProvider, searchPanel) {
 function emptyContent(element) {
   while(element.firstChild)
     element.removeChild(element.firstChild);
-}
-
-var GraphService = {
-  getGraphsForFeature: function(featureType, featureId) {
-    return[
-      {
-        name: "Pressione",
-        id: 10
-      },
-      {
-        name: "Volume",
-        id: 4
-      }
-    ]
-  }
 }
 
 function createFullWindownBlackPanelWithCloseAndContent() {
@@ -639,7 +652,7 @@ function createVerticalScrollPanel() {
 
 window.Extensions["FeatureChart.Ready"] = [];
 
-function installFeatureButton(urlProvider) {
+function FeatureButton(urlProvider) {
   var me = this;
   var measuresPopup = createFullWindownBlackPanelWithCloseAndContent();
   var content = createVerticalScrollPanel()
@@ -649,7 +662,7 @@ function installFeatureButton(urlProvider) {
     me.ws = new QuickWorkspace(urlProvider);
     var exts = window.Extensions["FeatureChart.Ready"];
     for(var i = 0; i < exts.length; i++)
-      exts[i](measuresPopup, ws.chart, function() { return me.serie; });
+      exts[i](measuresPopup, me.ws.chart, function() { return me.serie; });
   }
 
   var openSerieInQuickWorkspace = function(serie) {
@@ -668,31 +681,37 @@ function installFeatureButton(urlProvider) {
     openSerieInQuickWorkspace(serie);
   });
 
-  createButton = function(featureType, feature) {
-    var series = GraphService.getGraphsForFeature(featureType, feature);
-    if(series.length > 0)
-      return '<a href="#" featureType="' + featureType
-        + '" featureId="' + feature.id
-        + '" action="graphs">buttunettu</a>';
-    else {
-      return null;
-    }
+  var getGraphsForFeature = function(id, done) {
+    $.getJSON(urlProvider.getSeriesForFeature(id), done);
+  }
+
+  var createButton = function(featureType, feature) {
+    var id = "asdasd" + feature.id;
+    var series = getGraphsForFeature(feature.id, function(series){
+      if(series.length == 0) {
+        $("#" + id).hide();
+      }
+    });
+    return '<a href="#" id="' + id + '" featureType="' + featureType
+      + '" featureId="' + feature.id
+      + '" action="graphs">buttunettu</a>';
   };
 
-  buttonCallback = function(featureType, featureId) {
+  var buttonCallback = function(featureType, featureId) {
     emptyContent(content);
-    var series = GraphService.getGraphsForFeature(featureType, featureId);
-    if(series.length == 1)
-     openSerieInQuickWorkspace(series[0]);
-    else {
-      serieChooser.setSeries(series);
-      content.appendChild(serieChooser.getView());
-    }
+    getGraphsForFeature(featureId, function(series) {
+      if(series.length == 1)
+       openSerieInQuickWorkspace(series[0]);
+      else {
+        serieChooser.setSeries(series);
+        content.appendChild(serieChooser.getView());
+      }
+    });
     measuresPopup.show();
   }
 
-  var qte = window.Extensions["QueryToolbar.Actions"].
-    addAction("graphs", createButton, buttonCallback);
+  window.Extensions["QueryToolbar.Actions"].addAction("graphs",
+    createButton, buttonCallback);
 }
 
 function SearchForm() {
@@ -773,7 +792,7 @@ function SearchPanel(urlProvider) {
     });
   }
 
-  openSerie = function(serie) {
+  var openSerie = function(serie) {
     if(me.ws==undefined)
       makeWs();
 
@@ -807,13 +826,13 @@ function AddSerieToWorkspace(urlProvider, serie, doneCallback, cancelCallback) {
   view.appendChild(workspaceSelect);
   view.appendChild(chartSelect);
   view.appendChild(simpleLink("Annulla", cancelCallback));
-  add = function() {
+  var add = function() {
     doneCallback(me.workspaceId, me.chartId);
   }
 
   view.appendChild(simpleLink("Aggiungi", add));
 
-  reloadCharts = function() {
+  var reloadCharts = function() {
     emptyContent(chartSelect);
     var o = document.createElement("option");
     o.innerHTML = "[Nuovo grafico]";
@@ -845,6 +864,7 @@ function AddSerieToWorkspace(urlProvider, serie, doneCallback, cancelCallback) {
     workspaceSelect.appendChild(o);
     o.execute = function() { me.workspaceId = item.id; reloadCharts(); };
   });
+
   installCallbackOnOptions(workspaceSelect);
 
   me.view = view;
@@ -852,7 +872,7 @@ function AddSerieToWorkspace(urlProvider, serie, doneCallback, cancelCallback) {
 
 function popupAddSerieToWorkspace(urlProvider, serie, doneCallback) {
   var popup = window.PopupService.createModalPopup(),
-      content = new AddSerieToWorkspace(urlProvider, serie, function(workspaceId, chartId){
+      content = new AddSerieToWorkspace(urlProvider, serie, function(workspaceId, chartId) {
         if(doneCallback(workspaceId, chartId))
           popup.hide();
       }, function(){
@@ -864,7 +884,7 @@ function popupAddSerieToWorkspace(urlProvider, serie, doneCallback) {
 }
 
 function installAddSerieToWorkspace(workspacesPopup, workspacesPanel, urlProvider) {
-  addSerie = function(serie, workspaceId, chartId) {
+  var addSerie = function(serie, workspaceId, chartId) {
     alert("Adding serie " + serie + " to ws " + workspaceId + " chart " + chartId);
     if ( workspaceId != undefined )
       return workspaceId;
@@ -898,24 +918,28 @@ function installAddSerieToWorkspace(workspacesPopup, workspacesPanel, urlProvide
 }
 
 $(function(){
-  var serivcesUrl = '/gisclient3/services';
+  var servicesUrl = '/gisclient3/services';
 
   var urlProvider = {
     urlForSerie: function(ids, from, to) {
       var pars = 'ids=' + ids.join(",") + '&from=' + from + '&to=' + to;
-      return serivcesUrl + '/charts/?action=get_series&' + pars;
+      return servicesUrl + '/charts/?action=get_series&' + pars;
     },
 
     workspacesList: function() {
-      return serivcesUrl + '/charts/?action=workspaces_list';
+      return servicesUrl + '/charts/?action=workspaces_list';
     },
 
     workspace: function(id) {
-      return serivcesUrl + '/charts/?action=workspace&id=' + id;
+      return servicesUrl + '/charts/?action=workspace&id=' + id;
     },
 
     getSearchUrl: function(text) {
-      return serivcesUrl + '/charts/?action=searchMeasure&text=' + text;
+      return servicesUrl + '/charts/?action=searchMeasure&text=' + text;
+    },
+
+    getSeriesForFeature: function(id) {
+      return servicesUrl + '/charts/?action=getSeriesForFeature&featureId=' + id;
     }
   }
 
@@ -923,7 +947,7 @@ $(function(){
   var workspacesPanel = new WorkspacesPanel(urlProvider,
     new SearchPanel(urlProvider));
 
-  installFeatureButton(urlProvider);
+  new FeatureButton(urlProvider);
   installSideBarButton(workspacesPanel, workspacesPopup);
   installAddSerieToWorkspace(workspacesPopup, workspacesPanel, urlProvider);
 });
