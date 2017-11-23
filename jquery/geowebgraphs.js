@@ -109,7 +109,7 @@ function installSideBarButton(workspacesPanel, workspacesPopup) {
   measuresPopup.element().appendChild(content);
   content.appendChild(workspacesPanel.view());
 
-  var button = window.Extensions["SideToolbar.Buttons"].addButton(
+  var button = window.GCComponents["SideToolbar.Buttons"].addButton(
     "graphs", measuresPopup.show);
   button.iconName = "signal";
 }
@@ -735,7 +735,7 @@ function WorkspaceRepository(urlProvider) {
   me.reload();
 }
 
-window.Extensions["FeatureChart.Ready"] = [];
+window.GCComponents["FeatureChart.Ready"] = [];
 
 function FeatureButton(urlProvider) {
   var me = this;
@@ -745,7 +745,7 @@ function FeatureButton(urlProvider) {
 
   var makeWs = function() {
     me.ws = new QuickWorkspace(urlProvider);
-    var exts = window.Extensions["FeatureChart.Ready"];
+    var exts = window.GCComponents["FeatureChart.Ready"];
     for(var i = 0; i < exts.length; i++)
       exts[i](measuresPopup, me.ws.chart, function() { return me.serie; });
   }
@@ -795,7 +795,7 @@ function FeatureButton(urlProvider) {
     measuresPopup.show();
   }
 
-  window.Extensions["QueryToolbar.Actions"].addAction("graphs",
+  window.GCComponents["QueryToolbar.Actions"].addAction("graphs",
     createButton, buttonCallback);
 }
 
@@ -840,7 +840,7 @@ function ScrollPanelTop() {
   return wrap;
 }
 
-window.Extensions["SearchChart.Ready"] = [];
+window.GCComponents["SearchChart.Ready"] = [];
 
 function SearchPanel(urlProvider) {
   var me = this,
@@ -855,7 +855,7 @@ function SearchPanel(urlProvider) {
 
   var makeWs = function() {
     me.ws = new QuickWorkspace(urlProvider);
-    var exts = window.Extensions["SearchChart.Ready"];
+    var exts = window.GCComponents["SearchChart.Ready"];
     for(var i = 0; i < exts.length; i++)
       exts[i](me.ws.chart, function() { return me.serieId; });
   }
@@ -981,14 +981,14 @@ function installAddSerieToWorkspace(workspacesPopup, workspacesPanel, urlProvide
   };
 
 
-  window.Extensions["FeatureChart.Ready"].push(function(popup, chart, getSerie) {
+  window.GCComponents["FeatureChart.Ready"].push(function(popup, chart, getSerie) {
     chart.toolbar.add("...", function() {
       var serie = getSerie();
       popupAddSerieToWorkspace(workspaceRepository, urlProvider, serie, processData);
     });
   });
 
-  window.Extensions["SearchChart.Ready"].push(function(chart, getSerie) {
+  window.GCComponents["SearchChart.Ready"].push(function(chart, getSerie) {
     chart.toolbar.add("...", function() {
       var serie = getSerie();
       popupAddSerieToWorkspace(workspaceRepository, urlProvider, serie, processData);

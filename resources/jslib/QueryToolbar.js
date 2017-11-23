@@ -1,18 +1,19 @@
 $(function(){
-  window.Extensions["QueryToolbar.Actions"] = {
-    actions: [],
-    addAction: function(name, buttonFunction, callbackFunction) {
-      this.actions.push({
-        name: name,
-        buttonFunction: buttonFunction,
-        callbackFunction: callbackFunction
-      })
-    }
-  };
+    window.GCComponents["QueryToolbar.Actions"] = {
+        actions: [],
+        addAction: function(name, buttonFunction, callbackFunction) {
+            this.actions.push({
+                name: name,
+                buttonFunction: buttonFunction,
+                callbackFunction: callbackFunction
+            })
+        }
+    };
 });
 
+
 OpenLayers.GisClient.queryToolbar = OpenLayers.Class(OpenLayers.Control.Panel,{
-    
+
     // **** baseUrl - Gisclient service URL
     baseUrl : '/gisclient',
     resultLayer:null,
@@ -36,7 +37,7 @@ OpenLayers.GisClient.queryToolbar = OpenLayers.Class(OpenLayers.Control.Panel,{
     searchButtonHander: null,
     popup: null,
     popupOpenTimeout: null,
-    
+
     vectorFeaturesOverLimit: [], //oggetti non renderizzati per il maxVectorFeatures
 
     initialize: function(options) {
@@ -48,15 +49,15 @@ OpenLayers.GisClient.queryToolbar = OpenLayers.Class(OpenLayers.Control.Panel,{
                 {
                     baseUrl: this.baseUrl,
                     wfsCache:this.wfsCache,
-                    layers:this.visibleLayers,       
-                    queryFilters:this.queryFilters, 
-                    resultLayer:this.resultLayer, 
-                    maxFeatures:this.maxWfsFeatures,   
-                    maxVectorFeatures:this.maxVectorFeatures,       
+                    layers:this.visibleLayers,
+                    queryFilters:this.queryFilters,
+                    resultLayer:this.resultLayer,
+                    maxFeatures:this.maxWfsFeatures,
+                    maxVectorFeatures:this.maxVectorFeatures,
                     handlerOptions: {
                         irregular: true
                     },
-                    iconclass:"glyphicon-white glyphicon-fullscreen", 
+                    iconclass:"glyphicon-white glyphicon-fullscreen",
                     title:"Interroga la mappa",
                     text:"Box",
                     eventListeners: {'activate': function(){
@@ -73,15 +74,15 @@ OpenLayers.GisClient.queryToolbar = OpenLayers.Class(OpenLayers.Control.Panel,{
                 {
                     baseUrl: this.baseUrl,
                     wfsCache:this.wfsCache,
-                    layers:this.visibleLayers,                    
-                    queryFilters:this.queryFilters, 
-                    resultLayer:this.resultLayer, 
-                    maxFeatures:this.maxWfsFeatures,   
-                    maxVectorFeatures:this.maxVectorFeatures,   
+                    layers:this.visibleLayers,
+                    queryFilters:this.queryFilters,
+                    resultLayer:this.resultLayer,
+                    maxFeatures:this.maxWfsFeatures,
+                    maxVectorFeatures:this.maxVectorFeatures,
                     handlerOptions: {
                         sides: 30
                     },
-                    iconclass:"glyphicon-white glyphicon-screenshot", 
+                    iconclass:"glyphicon-white glyphicon-screenshot",
                     title:"Interroga la mappa",
                     text:"Circle",
                     eventListeners: {'activate': function(){
@@ -98,16 +99,16 @@ OpenLayers.GisClient.queryToolbar = OpenLayers.Class(OpenLayers.Control.Panel,{
                 {
                     baseUrl: this.baseUrl,
                     wfsCache:this.wfsCache,
-                    layers:this.visibleLayers,                    
-                    queryFilters:this.queryFilters, 
-                    resultLayer:this.resultLayer, 
-                    maxFeatures:this.maxWfsFeatures,   
-                    maxVectorFeatures:this.maxVectorFeatures,   
+                    layers:this.visibleLayers,
+                    queryFilters:this.queryFilters,
+                    resultLayer:this.resultLayer,
+                    maxFeatures:this.maxWfsFeatures,
+                    maxVectorFeatures:this.maxVectorFeatures,
                     handlerOptions: {
                         irregular: false,
                         freehand: true
                     },
-                    iconclass:"glyphicon-white glyphicon-edit", 
+                    iconclass:"glyphicon-white glyphicon-edit",
                     title:"Interroga la mappa",
                     text:"free",
                     eventListeners: {'activate': function(){
@@ -120,11 +121,11 @@ OpenLayers.GisClient.queryToolbar = OpenLayers.Class(OpenLayers.Control.Panel,{
                 }
             )
         ];
-        
+
         if(typeof(this.searchButtonHander) == 'function') {
             controls.push(new OpenLayers.Control.Button({
-                //type: OpenLayers.Control.TYPE_TOGGLE, 
-                iconclass:"glyphicon-white glyphicon-search", 
+                //type: OpenLayers.Control.TYPE_TOGGLE,
+                iconclass:"glyphicon-white glyphicon-search",
                 title:"Ricerca",
                 text:"Ricerca",
                 trigger:this.searchButtonHander
@@ -133,10 +134,10 @@ OpenLayers.GisClient.queryToolbar = OpenLayers.Class(OpenLayers.Control.Panel,{
 
         this.addControls(controls);
     },
-    
+
     deactivate: function() {
         var result = OpenLayers.Control.Panel.prototype.deactivate.apply(this);
-        
+
         if(result) {
             this.map.defaultControl.activate();
             this.map.currentControl = this.map.defaultControl;
@@ -179,10 +180,10 @@ OpenLayers.GisClient.queryToolbar = OpenLayers.Class(OpenLayers.Control.Panel,{
             for (index in this.map.config.selgroup){
                 list.add(this.getOption("Gruppo: "+this.map.config.selgroup[index].title,this.map.config.selgroup[index].type_name.join(",")));
             }
-        } 
+        }
         //AGGIUNGO GLI ALTRI RAGGRUPPATI PER TEMI
         for (index in this.wfsCache){
-            featureTypes = this.wfsCache[index].featureTypes; 
+            featureTypes = this.wfsCache[index].featureTypes;
             options=[];
             for(var i=0;i<featureTypes.length;i++){
                 if(featureTypes[i].searchable == 1 || featureTypes[i].searchable == 2){
@@ -230,7 +231,7 @@ OpenLayers.GisClient.queryToolbar = OpenLayers.Class(OpenLayers.Control.Panel,{
         if(value == OpenLayers.GisClient.queryToolbar.VISIBLE_LAYERS){
             for(var i=0;i<this.map.layers.length;i++){
                 layer = this.map.layers[i];
-                
+
                 if(this.wfsCache[layer.id]) {
                     if(GisClientMap.mapsetTiles && GisClientMap.mapsetTileLayer.getVisibility()) {
                         if (layer.nodes)
@@ -266,8 +267,9 @@ OpenLayers.GisClient.queryToolbar = OpenLayers.Class(OpenLayers.Control.Panel,{
             var typeNames = value.split(',');
             for(var i=0;i<typeNames.length;i++){
                 //DA SISTEMARE PERCHÈ ORA PRENDE I LIVELLI E NON LE FEATURETYPE.
-                layers.push(this.getLayerFromFeature(typeNames[i]))
+                layers.push(this.getLayerFromFeature(typeNames[i]));
             }
+            typeName = value;
         }else{
             layer = this.getLayerFromFeature(value);
             layers.push(layer);
@@ -278,23 +280,23 @@ OpenLayers.GisClient.queryToolbar = OpenLayers.Class(OpenLayers.Control.Panel,{
                 this.controls[i].layers=layers;
                 this.controls[i].queryFeatureType = typeName;
                 this.controls[i].onlyVisibleLayers= (value == OpenLayers.GisClient.queryToolbar.VISIBLE_LAYERS)
-            } 
+            }
         }
 
         var featureTypes = GisClientMap.featureTypes,
             len = featureTypes.length, fType, i;
-         
+
         for(i = 0; i < len; i++) {
             if(featureTypes[i].typeName == typeName) {
                 fType = featureTypes[i];
                 break;
             }
         }
-        
+
         if(!fType) return;
-        
+
         this.events.triggerEvent('featureTypeSelected', fType);
-        
+
     },
 
     //crea una option per select
@@ -313,7 +315,7 @@ OpenLayers.GisClient.queryToolbar = OpenLayers.Class(OpenLayers.Control.Panel,{
                 if(this.visibleLayers[i].id == e.layer.id) index = i
             };
             if(e.layer.visibility && e.layer.inRange){
-                index==-1 && this.visibleLayers.push(e.layer); 
+                index==-1 && this.visibleLayers.push(e.layer);
             }
             else{
                 index!=-1 && this.visibleLayers.splice(index,1);
@@ -377,12 +379,12 @@ OpenLayers.GisClient.queryToolbar = OpenLayers.Class(OpenLayers.Control.Panel,{
         else{
             //this.deactivateVectorControl();
             this.map.events.unregister('changelayer',this,this.updateVisibleLayers);
-            this.div.style.height="0px";   
+            this.div.style.height="0px";
            // this.featuresCombo.parentNode.removeChild(this.featuresCombo);
         }
 
     },
-    
+
     clearResults: function() {
         this.resultLayer.removeAllFeatures();
         this.resultLayer.setVisibility(false);
@@ -465,7 +467,7 @@ OpenLayers.GisClient.queryToolbar = OpenLayers.Class(OpenLayers.Control.Panel,{
             styleMap: this.resultStyle,
             displayInLayerSwitcher: true
         });
-        
+
         this.map.addLayer(resultLayer);
 
         //Setto i controlli
@@ -480,7 +482,7 @@ OpenLayers.GisClient.queryToolbar = OpenLayers.Class(OpenLayers.Control.Panel,{
                 renderIntent: "temporary"
             }
         );
-        
+
         selectControl.events.register('featurehighlighted', this, this.handleFeatureSelected);
         selectControl.events.register('featureunhighlighted', this, this.handleFeatureUnSelected);
 
@@ -488,14 +490,14 @@ OpenLayers.GisClient.queryToolbar = OpenLayers.Class(OpenLayers.Control.Panel,{
         highlightControl.events.register('featureunhighlighted', this, this.handleFeatureUnHighlighted);
 
         //this.map.addControl(modifyControl);
-        this.map.addControl(selectControl); 
+        this.map.addControl(selectControl);
         this.map.addControl(highlightControl);
-    
+
         this.selectControl = selectControl;
         this.highlightControl = highlightControl;
         //this.modifyControl = modifyControl;
-        
-        this.resultLayer = resultLayer;        
+
+        this.resultLayer = resultLayer;
 
     },
 
@@ -503,23 +505,28 @@ OpenLayers.GisClient.queryToolbar = OpenLayers.Class(OpenLayers.Control.Panel,{
         var lastLayer = this.map.layers[this.map.layers.length -1],
             maxIndex = this.map.getLayerIndex(lastLayer),
             resultIndex = this.map.getLayerIndex(this.resultLayer);
-        
+
         if(resultIndex < maxIndex) this.map.raiseLayer(this.resultLayer, (maxIndex - resultIndex));
-        
+
         this.highlightControl.activate();
         this.selectControl.activate();
     },
-    
+
     deactivateVectorControl: function(e){
         this.selectControl.deactivate();
         this.highlightControl.deactivate();
     },
 
     //SCRIVE IL VALORE DELL'ATTRIBUTO: DA RIPRISTINARE IL RENDER COME NELLA 2 (LINK, IMMAGINE.....)
-    writeDataAttribute: function(type,value){
+    writeDataAttribute: function(type,value,format){
+        if (format) {
+            value = sprintf(format, value);
+        }
         switch(type) {
             case 2: //collegamento
                 if(value) {
+                    if (typeof(this.map.config.baseDocUrl) != 'undefined')
+                        value = this.map.config.baseDocUrl + '/' + value;
                     value = '<a href="'+value+'" target="_blank" class="olControlButtonItemInactive olButton olLikeButton"><span class="glyphicon-white glyphicon-link"></span></a>';
                 }
             break;
@@ -529,31 +536,32 @@ OpenLayers.GisClient.queryToolbar = OpenLayers.Class(OpenLayers.Control.Panel,{
     },
 
     writeDataTable: function(featureType){
-        var col, colIndex, values, htmlTable, htmlHeaders = '', aCols = [], relation;
-        
-        if(featureType.features.length == 0) return false;//VEDERE DI METTRE NELLE OPZIONI SE AGGIUNGERE COMUNQUE GLI HEADERS        
-                
+        var col, colIndex, values, htmlTable, htmlHeaders = '', aCols = [], aFormats = [], relation;
+
+        if(featureType.features.length == 0) return false;//VEDERE DI METTRE NELLE OPZIONI SE AGGIUNGERE COMUNQUE GLI HEADERS
+
         htmlHeaders += '<th>Azioni</th>';
-        
+
         for (var i = 0; i < featureType.properties.length; i++) {
             col = featureType.properties[i];
             if(col.header && col.resultType!=4 && col.relationType!=2){
                 htmlHeaders += '<th>' + col.header + '</th>';
                 aCols.push(col.name);
+                aFormats.push(typeof(col.fieldFormat) != 'undefined'?col.fieldFormat:null);
             }
-        }; 
-        
+        };
+
         colIndex = aCols.length;
         //if(colIndex == 0) return false;
-               
+
         var fLen = featureType.features.length;
-        htmlTable = '<span>'+featureType.title+ ' ('+fLen+')';
+        htmlTable = '<span>'+featureType.title+ ' ('+fLen+') <span>';
         //link a tutte le features disabilitato per adesso... vediamo prima se serve
         if(false) htmlTable += ' <a href="#" zoomFType="'+featureType.typeName+'">Zoom</a>';
         // **** Add links for xml/pdf export
-        htmlTable += ' <a href="#" " featureType="'+featureType.typeName+'" action="xls" style="float:right"><img src="../resources/themes/icons/xls.gif">&nbsp;</a>';
-        htmlTable += ' <a href="#" " featureType="'+featureType.typeName+'" action="pdf" style="float:right"><img src="../resources/themes/icons/acrobat.gif">&nbsp;</a>';
-        htmlTable += '</span><table class="featureTypeData"><thead><tr>' + htmlHeaders + '</tr><tbody>';
+        htmlTable += ' <a href="#" " featureType="'+featureType.typeName+'" action="xls" style="float:right"><span class="icon-xls"></span></a>';
+        htmlTable += ' <a href="#" " featureType="'+featureType.typeName+'" action="pdf" style="float:right"><span class="icon-pdf"></span></a>';
+        htmlTable += '</span></span><table class="featureTypeData"><thead><tr>' + htmlHeaders + '</tr><tbody>';
         for (var j = 0; j < fLen; j++) {
             values = '<td feature-col="Azioni"><a class="olControlButtonItemInactive olButton olLikeButton" href="#" featureType="'+featureType.typeName+'" featureId="'+featureType.features[j].id+'" action="zoom"  buffer="'+(featureType.zoomBuffer || 0)+'" title="Zoom" style="margin:0"><span class="glyphicon-white glyphicon-search"></span></a>';
             values += this.buildActions(featureType, featureType.features[j]);
@@ -567,13 +575,14 @@ OpenLayers.GisClient.queryToolbar = OpenLayers.Class(OpenLayers.Control.Panel,{
                 }
             }
             values += '</td>';
-                    
+
             for (var i = 0; i < colIndex; i++) {
                 var fieldName = aCols[i];
+                var fieldFormat = aFormats[i];
                 var field = this.getFieldByName(featureType, fieldName);
-                values += '<td feature-col="' + field.header + '">'+ this.writeDataAttribute(field.fieldType, featureType.features[j].attributes[fieldName]) +'</td>';
+                values += '<td feature-col="' + field.header + '">'+ this.writeDataAttribute(field.fieldType, featureType.features[j].attributes[fieldName], fieldFormat) +'</td>';
             }
-            htmlTable +=  '<tr featureType="'+featureType.typeName+'" featureId="'+featureType.features[j].id+'">'+values+'</tr>';        
+            htmlTable +=  '<tr featureType="'+featureType.typeName+'" featureId="'+featureType.features[j].id+'">'+values+'</tr>';
         }
 
         htmlTable += '</tbody></table>';
@@ -586,12 +595,12 @@ OpenLayers.GisClient.queryToolbar = OpenLayers.Class(OpenLayers.Control.Panel,{
         return featureTypeDiv;
         */
     },
-    
+
     buildActions: function(featureType, feature) {
-        var ext = window.Extensions["QueryToolbar.Actions"];
+        var ext = window.GCComponents["QueryToolbar.Actions"];
         var result = '';
         ext.actions.forEach(function(a) {
-          result += a.buttonFunction(featureType, feature);
+            result += a.buttonFunction(featureType, feature);
         });
         return result;
     },
@@ -599,18 +608,18 @@ OpenLayers.GisClient.queryToolbar = OpenLayers.Class(OpenLayers.Control.Panel,{
     getFieldByName: function(featureType, fieldName) {
         var field = null,
             len = featureType.properties.length, property, i;
-        
+
         for(i = 0; i < len; i++) {
             property = featureType.properties[i];
-            
+
             if(property.name == fieldName) field = property;
         }
-        
+
         return field;
     },
 
     writeDataPopup: function (event) {
-        var col, colIndex, values, aCols = [], relation;
+        var col, colIndex, values, aCols = [], aFormats = [], relation;
         var feature = event.feature;
         var featureType = GisClientMap.getFeatureType(feature.featureTypeName);
 
@@ -622,32 +631,34 @@ OpenLayers.GisClient.queryToolbar = OpenLayers.Class(OpenLayers.Control.Panel,{
             col = featureType.properties[i];
             if(col.header && col.resultType!=4 && col.resultType != 20 && col.relationType!=2){
                 aCols.push(col.name);
+                aFormats.push(typeof(col.fieldFormat) != 'undefined'?col.fieldFormat:null);
             }
-        }; 
+        };
         colIndex = aCols.length;
-        
+
         var htmlPopup = '<span>' +featureType.title+ '</span><table class="featureTypeData"><tbody>';
 
-        
+
         values = '';
-                    
+
         for (var i = 0; i < colIndex; i++) {
             var fieldName = aCols[i];
+            var fieldFormat = aFormats[i];
             var field = this.getFieldByName(featureType, fieldName);
-            values += '<td feature-col="' + field.header + '">'+ this.writeDataAttribute(field.fieldType, feature.attributes[fieldName]) +'</td>';
+            values += '<td feature-col="' + field.header + '">'+ this.writeDataAttribute(field.fieldType, feature.attributes[fieldName], fieldFormat) +'</td>';
          }
-         
-        htmlPopup +=  '<tr featureType="'+featureType.typeName+'" featureId="'+feature.id+'">'+values+'</tr>';        
+
+        htmlPopup +=  '<tr featureType="'+featureType.typeName+'" featureId="'+feature.id+'">'+values+'</tr>';
 
         htmlPopup += '</tbody></table>';
-        
+
         var popupInfo = '<div class="smalltable"><div class="featureTypeTitle">' + htmlPopup + '</div></div>';
 
         var pPosX = event.object.handlers.feature.evt.layerX;
         var pPosY = event.object.handlers.feature.evt.layerY;
         var nMapXCenter = this.map.getExtent().getCenterPixel().x;
         var nMapYCenter = this.map.getExtent().getCenterPixel().y;
-        
+
         var oPopupPos = this.map.getLonLatFromPixel(new OpenLayers.Pixel(pPosX, pPosY));
 
         var popup = new OpenLayers.Popup.FramedCloud(
@@ -672,7 +683,7 @@ popup.autoSize = true;
         //popup.anchor.offset.x = 5;
         //popup.anchor.offset.y =  -8;
         popup.padding = new OpenLayers.Bounds(2,2,2,2);
-        popup.keepInMap = true; 
+        popup.keepInMap = true;
         //popup.contentDiv.className = "smalltable olPopupContent";
         feature.popup = popup;
         var self = this;
@@ -701,31 +712,31 @@ popup.autoSize = true;
         //this.resultTarget.innerHTML =  '';
         this.events.triggerEvent('startQueryMap');
     },
-    
+
     handleFeatureResult: function(e) {
         this.renderQueue.push(e);
     },
 
     //questa per adesso non viene usata, proviamo a fare il rendering tutto insieme per vedere se le performance migliorano...
     writeResultPanel: function(e) {
-        
+
         var me = this;
         //opzioni tabella lista popup todo
         //attivare opzione scrivo anche se la lista dei risultati è vuota
         if(e.properties){
             var resDiv = me.writeDataTable(e);
             resDiv && me.resultTarget.appendChild(resDiv);
-            
+
             var links = me.resultTarget.getElementsByTagName('a'),
                 len = links.length, link, i;
-            
+
             for(i = 0; i < len; i++) {
                 link = links[i];
-                
+
                 if(!link.addEventListener) continue;
                 link.addEventListener('click', function(event) {
                     event.stopPropagation();
-                    
+
                     var action = this.getAttribute('action');
                     var featureType = this.getAttribute('featureType');
                     var featureId = this.getAttribute('featureId');
@@ -748,13 +759,13 @@ popup.autoSize = true;
                                     var feature = me.resultLayer.getFeatureById(featureId);
                                     if(!feature) return console.log('viewDetails: non trovo la feature ', featureType, featureId);
                                     params.feature = feature;
-                                    
+
                                     me.getFeatureDetails(featureType, feature, relationName);
                                 }
                             break;
                         }
                     }
-                    
+
                 }, false);
             }
         }
@@ -767,39 +778,39 @@ popup.autoSize = true;
 
         for(i = 0; i < len; i++) {
             event = this.renderQueue[i];
-            
+
             if(!event || !event.properties) continue;
-            
+
             html = me.writeDataTable(event);
-            
+
             if(!html) continue;
-            
+
             divs += '<div class="featureTypeTitle">' + html + '</div>';
         }
-        
+
         this.renderQueue = [];
-        
+
         if(divs.length) {
             if(me.resultTarget.firstChild) {
                 console.log('removeChild...');
                 me.resultTarget.removeChild(me.resultTarget.firstChild);
             }
-        
+
             resultDiv = document.createElement("div");
             resultDiv.innerHTML = divs;
-            
+
             me.resultTarget.appendChild(resultDiv);
 
             var links = me.resultTarget.getElementsByTagName('a'),
                 len = links.length, link, i;
-            
+
             for(i = 0; i < len; i++) {
                 link = links[i];
-                
+
                 if(!link.addEventListener) continue;
                 link.addEventListener('click', function(event) {
                     event.stopPropagation();
-                    
+
                     var action = this.getAttribute('action');
                     var featureType = this.getAttribute('featureType');
                     var featureId = this.getAttribute('featureId');
@@ -836,7 +847,7 @@ popup.autoSize = true;
                                     var feature = me.resultLayer.getFeatureById(featureId);
                                     if(!feature) return console.log('viewDetails: non trovo la feature ', featureType, featureId);
                                     params.feature = feature;
-                                    
+
                                     me.getFeatureDetails(featureType, feature, relationName);
                                 }
                             break;
@@ -846,20 +857,19 @@ popup.autoSize = true;
                             case 'pdf':
                                 me.exportFeatureType(featureType, 'pdf');
                             break;
-                         
                             default:
-                              var ext = window.Extensions["QueryToolbar.Actions"];
-                              ext.actions.forEach(function(a) {
-                                if ( a.name == action )
-                                  a.callbackFunction(featureType, featureId);
-                              });
+                                var ext = window.GCComponents["QueryToolbar.Actions"];
+                                ext.actions.forEach(function(a) {
+                                    if ( a.name == action )
+                                a.callbackFunction(featureType, featureId, me);
+                                });
                         }
                     }
-                    
+
                 }, false);
             }
         }
-        
+
         var loadingControl = this.map.getControlsByClass('OpenLayers.Control.LoadingPanel')[0];
         loadingControl.minimizeControl();
 
@@ -877,11 +887,11 @@ popup.autoSize = true;
         }
         this.events.triggerEvent('endQueryMap', event);
     },
-    
+
     findFeature: function(featureId) {
         var feature = this.resultLayer.getFeatureById(featureId);
         if(feature) return feature;
-        
+
         var len = this.vectorFeaturesOverLimit.length, i,
             feature = null;
 
@@ -890,30 +900,30 @@ popup.autoSize = true;
                 feature = this.vectorFeaturesOverLimit[i];
             }
         }
-        
+
         if(feature) {
             this.resultLayer.addFeatures([feature]);
         }
         return feature;
     },
-    
+
     exportFeatureType: function (featureType, format){
         var data = [], fields = [], propLen, featLen;
         var fType = GisClientMap.getFeatureType(featureType);
-        
+
         if(!fType) return alert('Errore: il featureType '+featureType+' non esiste');
-        
+
         propLen = fType.properties.length;
-        
+
         for (var i = 0; i < propLen; i++) {
             var col = fType.properties[i];
             if(col.header && col.resultType!=4 && col.relationType!=2){
                 fields.push({field_name:col.name, title:col.header, type:col.fieldType});
             }
-        }; 
-        
+        };
+
         featLen = this.resultLayer.features.length;
-        
+
         for (var j = 0; j < featLen; j++){
             var feat = this.resultLayer.features[j];
             if (feat.featureTypeName == featureType) {
@@ -923,16 +933,16 @@ popup.autoSize = true;
                     tmpArr [field.field_name] = feat.attributes[field.field_name];
                 }
                 data.push(tmpArr);
-            } 
+            }
         }
-        
+
         var params = {
             export_format: format,
             feature_type: featureType,
             data: data,
             fields: fields
         };
-        
+
         var request = OpenLayers.Request.POST({
             url: this.baseUrl + '/services/export.php',
             data: JSON.stringify(params),
@@ -944,20 +954,20 @@ popup.autoSize = true;
                     if(!response || typeof(response) != 'object' || !response.status || response.status != 200) {
                         return alert('Errore di sistema');
                     }
-                
+
                     if (!response.responseText) {
                         return alert('Nessun file generato, errore non previsto');
                     }
-                    
+
                     var responseObj = JSON.parse(response.responseText);
-                    
+
                     if (!responseObj.result || responseObj.result != 'ok') {
                         var errMessage = 'Errore in generazione file';
                         if (responseObj.error)
                             errMessage += ' - Dettagli: ' + responseObj.error;
                         return alert (errMessage);
                     }
-                    
+
                     if (fmt == 'xls') {
                         window.location.assign(responseObj.file);
                     }
@@ -969,33 +979,33 @@ popup.autoSize = true;
             scope: this
         });
     },
-    
+
     getFeatureDetails: function(featureType, feature, relationName) {
         var fType = GisClientMap.getFeatureType(featureType);
-        
+
         if(!feature) return console.log('Feature undefined');
         if(!fType) return alert('Errore: il featureType '+featureType+' non esiste');
-        
+
         var len = fType.properties.length, property, i,
             pkey;
 
         for(i = 0; i < len; i++) {
             property = fType.properties[i];
-            
+
             if(property.isPrimaryKey) {
                 pkey = property.name;
                 break;
             }
         }
-        
+
         if(!pkey) {
             return alert('Errore: la primary key non è tra i campi del layer, impossibile visualizzare i dati collegati');
         }
-        
+
         if(!feature.attributes[pkey]) {
             return alert('Errore: la feature selezionata non ha un valore per la primary key '+pkey);
         }
-        
+
         var params = {
             projectName: GisClientMap.projectName,
             mapsetName: GisClientMap.mapsetName,
@@ -1015,35 +1025,35 @@ popup.autoSize = true;
                 if(!response || typeof(response) != 'object' || !response.status || response.status != 200) {
                     return alert('Errore di sistema');
                 }
-                
+
                 var eventData = {
                     featureType: featureType,
                     feature: feature,
                     relation: {relationName: relationName},
                     response: response
                 };
-                
+
                 this.events.triggerEvent('viewdetails', eventData);
             },
             scope: this
         });
     },
-    
+
     handleFeatureSelected: function(event) {
         var me = this,
             feature = event.feature;
-        
+
         me.writeDataPopup(event);
         me.events.triggerEvent('featureselected', {feature:feature});
     },
-    
+
     handleFeatureUnSelected: function(event) {
         var me = this,
             feature = event.feature;
-        
+
         me.events.triggerEvent('featureunselected', {feature:feature});
     },
-    
+
     handleFeatureHighlighted: function(event) {
         var me = this,
             feature = event.feature;
@@ -1051,11 +1061,11 @@ popup.autoSize = true;
         me.writeDataPopup(event);
         me.events.triggerEvent('featurehighlighted', {feature:feature});
     },
-    
+
     handleFeatureUnHighlighted: function(event) {
         var me = this,
             feature = event.feature;
-        
+
         me.events.triggerEvent('featureunhighlighted', {feature:feature});
     },
 
