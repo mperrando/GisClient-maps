@@ -61,7 +61,7 @@ function ajaxForEachElement(url, callback) {
 function installCallbackOnOptions(select) {
   var lastIndex = null;
   var f = function() {
-    if(select.options[select.selectedIndex].execute())
+    if(select.options[select.selectedIndex].execute(select.options[select.selectedIndex]))
       lastIndex = select.selectedIndex;
     else
       select.selectedIndex = lastIndex;
@@ -69,6 +69,52 @@ function installCallbackOnOptions(select) {
   select.onchange = f;
   f();
 }
+
+function indexOfOption(select, predicate) {
+  for( var i = 0; i < select.options.length; i++) {
+    if ( predicate(select.options[i]))
+      return i;
+  }
+  return -1;
+}
+
+function emptyContent(element) {
+  while(element.firstChild)
+    element.removeChild(element.firstChild);
+}
+
+function createFullWindownBlackPanelWithCloseAndContent() {
+  var result = window.PopupService.createModalPopup();
+  $(result.element()).addClass('pino');
+  var closebtn = document.createElement("a");
+  closebtn.href = "#";
+  closebtn.innerHTML = "serite";
+  $(closebtn).on("click", function() {
+    result.hide();
+  });
+  result.element().appendChild(closebtn);
+  return result;
+}
+
+function createVerticalScrollPanel() {
+  var result = document.createElement("div");
+  $(result).css("height", "100%");
+  $(result).css("overflow-y", "scroll");
+  return result;
+}
+
+function installSideBarButton(workspacesPanel, workspacesPopup) {
+  var measuresPopup = workspacesPopup,
+      content = createVerticalScrollPanel();
+  measuresPopup.element().appendChild(content);
+  content.appendChild(workspacesPanel.view());
+
+  var button = window.Extensions["SideToolbar.Buttons"].addButton(
+    "graphs", measuresPopup.show);
+  button.iconName = "signal";
+}
+
+/********************************************/
 
 function FormLabel(text) {
   var me = this,
@@ -479,18 +525,23 @@ function ChartsWorkspace(urlProvider) {
   var me = this;
   var chartsPanel = new ChartsPanel(urlProvider.urlForSerie);
   var view = document.createElement("div"),
-    workspaceData = null,
+    titleBar = document.createElement("div"),
+    saveBtn = simpleLink("Save", function() { me.save(); }),
+    workspaceData = {},
     timeControlBar = new TimeControlBar(chartsPanel.setTimeRange, chartsPanel.getTimeRange),
-    dirty = false;
+    dirty = false,
+    beforeunload = function() {
+      if ( dirty )
+    	  return 'confirm please';
+    };
 
-  $(window).bind('beforeunload', function() {
-    if ( dirty )
-  	  return 'confirm please';
-  });
+  $(window).bind('beforeunload', beforeunload);
 
   $(view).addClass("chartsWorkspace");
   //$(view).css("padding", 20);
   view.appendChild(timeControlBar.view());
+  view.appendChild(titleBar);
+  titleBar.appendChild(saveBtn);
   view.appendChild(chartsPanel.view());
 
   chartsPanel.rangeChanged = chartsPanel.setTimeRange;
@@ -513,6 +564,8 @@ function ChartsWorkspace(urlProvider) {
 
   var refreshGraphs = function() {
     chartsPanel.clear();
+    if ( !workspaceData )
+      return;
     var graphs = workspaceData.graphs;
     for(var i = 0; i < graphs.length; i++) {
       chartsPanel.addChart(graphs[i].series, graphs[i].name);
@@ -535,8 +588,8 @@ function ChartsWorkspace(urlProvider) {
   me.load = function(id) {
     if ( dirty && !confirmLoseData() )
       return false;
-    $.getJSON(urlProvider.workspace(id), function(data) {
-      workspaceData = data;
+    $.getJSON(urlProvider.workspace(id), function(w) {
+      workspaceData = w.data || { graphs:[] };
       dirty = false;
       refreshGraphs();
       if(workspaceData.timeRange != undefined) {
@@ -544,6 +597,14 @@ function ChartsWorkspace(urlProvider) {
       }
     });
     return true;
+  }
+
+  me.save = function() {
+    if ( !dirty)
+      return;
+    $.post(urlProvider.save_workspace(workspaceData.id),
+      { data: workspaceData }
+    );
   }
 
   me.clear = function() {
@@ -556,7 +617,7 @@ function ChartsWorkspace(urlProvider) {
   }
 }
 
-function WorkspacesPanel(urlProvider, searchPanel) {
+function WorkspacesPanel(workspaceRepository, urlProvider, searchPanel) {
   var me = this,
       view = document.createElement("div"),
       workspaceSelect = document.createElement("select"),
@@ -570,21 +631,35 @@ function WorkspacesPanel(urlProvider, searchPanel) {
 
   var chartsWorkspace = new ChartsWorkspace(urlProvider);
 
+  workspaceRepository.addListener({
+    refreshed: function() { populateWorkspaceSelect(); }
+  });
+
   var populateWorkspaceSelect = function() {
+    var currentValue;
+    if ( workspaceSelect.selectedIndex > -1 )
+      currentValue = workspaceSelect.options[workspaceSelect.selectedIndex].value;
     emptyContent(workspaceSelect);
     var o = document.createElement("option");
     o.innerHTML = "Ricerca...";
     o.value = -1;
     o.execute = mustOpenSearch;
     workspaceSelect.appendChild(o);
-    ajaxForEachElement(urlProvider.workspacesList(), function(item) {
-      var o = document.createElement("option");
-      o.innerHTML = item.name;
-      var id = item.id;
-      o.value = id;
-      workspaceSelect.appendChild(o);
-      o.execute = function() { return mustChangeWorkspace(id); }
-    });
+    for(var i = 0; i < workspaceRepository.items.length; i++) {
+      (function(i) {
+        var item = workspaceRepository.items[i];
+        var o = document.createElement("option");
+        o.innerHTML = item.name;
+        o.value = item.id;
+        workspaceSelect.appendChild(o);
+        o.execute = function(o) { return mustChangeWorkspace(item); }
+      })(i);
+    }
+    if ( currentValue != undefined ) {
+      workspaceSelect.selectedIndex =
+        indexOfOption(workspaceSelect, function(o) { return o.value == currentValue; });
+    }
+    installCallbackOnOptions(workspaceSelect);
   };
 
   var mustOpenSearch = function() {
@@ -596,58 +671,68 @@ function WorkspacesPanel(urlProvider, searchPanel) {
     return true;
   }
 
-  var mustChangeWorkspace = function(id) {
-    if(!chartsWorkspace.load(id))
+  var mustChangeWorkspace = function(workspace) {
+    if(!chartsWorkspace.load(workspace.id))
       return false;
     emptyContent(workspacePanel);
     workspacePanel.appendChild(chartsWorkspace.view());
     return true;
   }
 
-  var indexForWorkspace = function(id) {
-    return indexForOptionWithValue(workspaceSelect, id);
+  var indexForWorkspace = function(workspace) {
+    return indexForOptionWithValue(workspaceSelect, workspace);
   }
 
   populateWorkspaceSelect();
-  installCallbackOnOptions(workspaceSelect);
 
   me.view = function() { return view; }
-  me.openWorkspace = function(id) {
-    var idx = indexForWorkspace(id);
+
+  me.openWorkspace = function(workspace) {
+    var idx = indexForWorkspace(workspace.id);
     if ( idx != undefined ) {
       workspaceSelect.selectedIndex = idx;
-      return mustChangeWorkspace(id);
+      return mustChangeWorkspace(workspace);
     }
     else {
-      alert("Workspace not found: " + id);
+      alert("Workspace not found: " + workspace.id);
       return false;
     }
   }
 }
 
-function emptyContent(element) {
-  while(element.firstChild)
-    element.removeChild(element.firstChild);
-}
+function WorkspaceRepository(urlProvider) {
+  var me = this,
+      listeners = [],
+      noitfyListeners = function() {
+        for(var i = 0; i < listeners.length; i++) {
+          listeners[i].refreshed();
+        }
+      };
 
-function createFullWindownBlackPanelWithCloseAndContent() {
-  var result = window.PopupService.createModalPopup();
-  $(result.element()).addClass('pino');
-  var closebtn = document.createElement("a");
-  closebtn.href = "#";
-  closebtn.innerHTML = "serite";
-  $(closebtn).on("click", function() {
-    result.hide();
-  });
-  result.element().appendChild(closebtn);
-  return result;
-}
+  me.addListener = function(listener) {
+    listeners.push(listener);
+  };
 
-function createVerticalScrollPanel() {
-  var result = document.createElement("div");
-  $(result).css("height", "100%");
-  $(result).css("overflow-y", "scroll");
-  return result;
+  me.reload = function() {
+    me.items = [];
+    $.getJSON(urlProvider.workspacesList(), function(data) {
+      me.items = data;
+      noitfyListeners();
+    });
+  }
+
+  me.create = function(cb) {
+    $.post(urlProvider.save_workspace(), {
+        data: { name: "WS " + new Date() }
+      }, function(d){
+      me.items.push(d);
+      noitfyListeners();
+      cb(d);
+    });
+  }
+
+  me.items = [];
+  me.reload();
 }
 
 window.Extensions["FeatureChart.Ready"] = [];
@@ -655,7 +740,7 @@ window.Extensions["FeatureChart.Ready"] = [];
 function FeatureButton(urlProvider) {
   var me = this;
   var measuresPopup = createFullWindownBlackPanelWithCloseAndContent();
-  var content = createVerticalScrollPanel()
+  var content = createVerticalScrollPanel();
   measuresPopup.element().appendChild(content);
 
   var makeWs = function() {
@@ -806,18 +891,7 @@ function SearchPanel(urlProvider) {
   searchForm.onSubmit = me.execute;
 }
 
-function installSideBarButton(workspacesPanel, workspacesPopup) {
-  var measuresPopup = workspacesPopup,
-      content = createVerticalScrollPanel();
-  measuresPopup.element().appendChild(content);
-  content.appendChild(workspacesPanel.view());
-
-  var button = window.Extensions["SideToolbar.Buttons"].addButton(
-    "graphs", measuresPopup.show);
-  button.iconName = "signal";
-}
-
-function AddSerieToWorkspace(urlProvider, serie, doneCallback, cancelCallback) {
+function AddSerieToWorkspace(workspaceRepository, urlProvider, serie, doneCallback, cancelCallback) {
   var me = this,
       view = centralWindow("Aggiungi a workspce");
 
@@ -827,7 +901,7 @@ function AddSerieToWorkspace(urlProvider, serie, doneCallback, cancelCallback) {
   view.appendChild(chartSelect);
   view.appendChild(simpleLink("Annulla", cancelCallback));
   var add = function() {
-    doneCallback(me.workspaceId, me.chartId);
+    doneCallback(me.workspace, me.chartId);
   }
 
   view.appendChild(simpleLink("Aggiungi", add));
@@ -839,14 +913,16 @@ function AddSerieToWorkspace(urlProvider, serie, doneCallback, cancelCallback) {
     chartSelect.appendChild(o);
     o.execute = function() { me.chartId = null; };
 
-    if(me.workspaceId) {
-      $.getJSON(urlProvider.workspace(me.workspaceId), function(data) {
+    if(me.workspace) {
+      $.getJSON(urlProvider.workspace(me.workspace.id), function(data) {
         for(var i = 0; i < data.graphs.length; i++) {
-          var o = document.createElement("option"),
-              item = data.graphs[i];
-          o.innerHTML = item.name;
-          chartSelect.appendChild(o);
-          o.execute = function() { me.chartId = item.id; }
+          (function(i) {
+            var o = document.createElement("option"),
+                item = data.graphs[i];
+            o.innerHTML = item.name;
+            chartSelect.appendChild(o);
+            o.execute = function() { me.chartId = item.id; }
+          })(i);
         }
       });
     }
@@ -856,25 +932,28 @@ function AddSerieToWorkspace(urlProvider, serie, doneCallback, cancelCallback) {
   var o = document.createElement("option");
   o.innerHTML = "[Nuovo workspace]";
   workspaceSelect.appendChild(o);
-  o.execute = function() { me.workspaceId = null; reloadCharts(); };
+  o.execute = function() { me.workspace = {} ; reloadCharts(); };
 
-  ajaxForEachElement(urlProvider.workspacesList(), function(item) {
-    var o = document.createElement("option");
-    o.innerHTML = item.name;
-    workspaceSelect.appendChild(o);
-    o.execute = function() { me.workspaceId = item.id; reloadCharts(); };
-  });
+  for(var i = 0; i < workspaceRepository.items.length; i++) {
+    (function(i) {
+      var item = workspaceRepository.items[i];
+      var o = document.createElement("option");
+      o.innerHTML = item.name;
+      workspaceSelect.appendChild(o);
+      o.execute = function() { me.workspace = item; reloadCharts(); };
+    })(i);
+  }
 
   installCallbackOnOptions(workspaceSelect);
 
   me.view = view;
 }
 
-function popupAddSerieToWorkspace(urlProvider, serie, doneCallback) {
+function popupAddSerieToWorkspace(workspaceRepository, urlProvider, serie, doneCallback) {
   var popup = window.PopupService.createModalPopup(),
-      content = new AddSerieToWorkspace(urlProvider, serie, function(workspaceId, chartId) {
-        if(doneCallback(workspaceId, chartId))
-          popup.hide();
+      content = new AddSerieToWorkspace(workspaceRepository, urlProvider, serie, function(workspace, chartId) {
+        popup.hide();
+        doneCallback(serie, workspace, chartId);
       }, function(){
         popup.hide();
       }),
@@ -883,36 +962,36 @@ function popupAddSerieToWorkspace(urlProvider, serie, doneCallback) {
   popup.show();
 }
 
-function installAddSerieToWorkspace(workspacesPopup, workspacesPanel, urlProvider) {
-  var addSerie = function(serie, workspaceId, chartId) {
-    alert("Adding serie " + serie + " to ws " + workspaceId + " chart " + chartId);
-    if ( workspaceId != undefined )
-      return workspaceId;
-    else
-      return 9999;
-  }
+function installAddSerieToWorkspace(workspacesPopup, workspacesPanel, urlProvider, workspaceRepository) {
+  var addSerie = function(serie, workspace, chartId) {
+    alert("Adding serie " + serie + " to ws " + workspace + " chart " + chartId);
+  },
+  processData = function(serie, workspace, chartId) {
+    if ( workspace.id == undefined )
+      workspaceRepository.create(function(workspace){
+        addSerie(serie, workspace, chartId);
+        workspacesPopup.show();
+        workspacesPanel.openWorkspace(workspace);
+      });
+    else {
+      addSerie(serie, workspace, chartId);
+      workspacesPopup.show();
+      workspacesPanel.openWorkspace(workspace);
+    }
+  };
+
 
   window.Extensions["FeatureChart.Ready"].push(function(popup, chart, getSerie) {
     chart.toolbar.add("...", function() {
       var serie = getSerie();
-      popupAddSerieToWorkspace(urlProvider, serie, function(workspaceId, chartId) {
-        var targetWs = addSerie(serie, workspaceId, chartId);
-        popup.hide();
-        workspacesPopup.show();
-        workspacesPanel.openWorkspace(targetWs);
-        return true;
-      });
+      popupAddSerieToWorkspace(workspaceRepository, urlProvider, serie, processData);
     });
   });
 
   window.Extensions["SearchChart.Ready"].push(function(chart, getSerie) {
     chart.toolbar.add("...", function() {
       var serie = getSerie();
-      popupAddSerieToWorkspace(urlProvider, serie, function(workspaceId, chartId) {
-        var targetWs = addSerie(serie, workspaceId, chartId);
-        workspacesPanel.openWorkspace(targetWs);
-        return true;
-      });
+      popupAddSerieToWorkspace(workspaceRepository, urlProvider, serie, processData);
     });
   });
 }
@@ -930,6 +1009,13 @@ $(function(){
       return servicesUrl + '/charts/?action=workspaces_list';
     },
 
+    save_workspace: function(id) {
+      var url = servicesUrl + '/charts/?action=save_workspace';
+      if ( id != undefined)
+        url += '&id=' + id;
+      return url;
+    },
+
     workspace: function(id) {
       return servicesUrl + '/charts/?action=workspace&id=' + id;
     },
@@ -943,11 +1029,12 @@ $(function(){
     }
   }
 
+  var workspaceRepository = new WorkspaceRepository(urlProvider);
   var workspacesPopup = createFullWindownBlackPanelWithCloseAndContent();
-  var workspacesPanel = new WorkspacesPanel(urlProvider,
+  var workspacesPanel = new WorkspacesPanel(workspaceRepository, urlProvider,
     new SearchPanel(urlProvider));
 
   new FeatureButton(urlProvider);
   installSideBarButton(workspacesPanel, workspacesPopup);
-  installAddSerieToWorkspace(workspacesPopup, workspacesPanel, urlProvider);
+  installAddSerieToWorkspace(workspacesPopup, workspacesPanel, urlProvider, workspaceRepository);
 });
