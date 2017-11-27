@@ -21,8 +21,14 @@ function uid(groups) {
 }
 
 Array.prototype.move = function(from,to) {
-  this.splice(to,0,this.splice(from,1)[0]);
+  this.splice(to, 0, this.splice(from, 1)[0]);
   return this;
+};
+
+Array.prototype.remove = function(element) {
+  var idx = this.indexOf(element);
+  if ( idx > -1 )
+    this.splice(idx, 1);
 };
 
 function moveInElement(e, from, to) {
@@ -143,6 +149,17 @@ function FormLabel(text) {
   me.view = view;
   view.appendChild(label);
   label.innerText = text;
+}
+
+function TextField(placeholder) {
+  var field = document.createElement("input"),
+      view = field;
+  field.type = "text";
+  field.placeholder = placeholder;
+
+  this.view = function() { return view; }
+  this.value = function() { return field.value; }
+  this.setValue = function(v) { field.value = v; }
 }
 
 function DateFieldJqueruUI() {
@@ -332,6 +349,56 @@ function TimeControlBar(onChange, getCurrent) {
   }
 }
 
+/********************************/
+
+function WorkspacesRepository(urlProvider) {
+  var me = this,
+      listeners = [],
+      noitfyListeners = function() {
+        for(var i = 0; i < listeners.length; i++) {
+          listeners[i].refreshed();
+        }
+      };
+
+  me.addListener = function(listener) {
+    listeners.push(listener);
+  };
+
+  me.reload = function() {
+    me.items = [];
+    $.getJSON(urlProvider.workspacesList(), function(data) {
+      me.items = data;
+      noitfyListeners();
+    });
+  }
+
+  me.create = function(cb) {
+    $.post(urlProvider.save_workspace(), {
+        data: { name: "WS " + new Date(), data: {} }
+      }, function(d){
+      me.items.push(d);
+      noitfyListeners();
+      cb(d);
+    });
+  }
+
+  me.items = [];
+  me.reload();
+
+  me.get = function(id, onReady) {
+    $.getJSON(urlProvider.workspace(id), function(w) {
+      w = w || {};
+      w.data = w.data || {};
+      w.data.graphs = w.data.graphs || [];
+      for ( var i = 0; i < w.data.graphs.length; i++ )
+        w.data.graphs[i].series = w.data.graphs[i].series || [];
+      onReady(w);
+    });
+  }
+}
+
+/******************************************/
+
 function SerieChooser(callback) {
   var me = this,
       view = centralWindow("Scegli la misura da visualizzare"),
@@ -454,6 +521,9 @@ function ChartsPanel(getUrl) {
     var down = chart.toolbar.add("Giù", function(){
       moveDown(chart);
     });
+    var edit = chart.toolbar.add("...", function(){
+      editChart(chart);
+    });
     return {
       calcVisibles: calcVisibles,
     }
@@ -484,6 +554,16 @@ function ChartsPanel(getUrl) {
     notifyPanelMoved(idx, idx - 1);
   }
 
+  var editChart = function(chart) {
+    var idx = charts.indexOf(chart);
+    if ( me.onEdit )
+      me.onEdit(idx, function(ids, name) {
+        chart.setIds(ids);
+        chart.setTitle(name);
+        chart.refresh();
+      });
+  }
+
   var notifyPanelMoved = function(from, to) {
     if ( me.onPanelMoved )
       me.onPanelMoved(from, to);
@@ -501,10 +581,10 @@ function ChartsPanel(getUrl) {
   }
 
   me.addChart = function(ids, name) {
-    var chart = new ChartPanel(getUrl);
+    var chart = new ChartPanel(getUrl, { forcelegend: true });
     chart.setIds(ids);
-    charts.push(chart);
     chart.setTitle(name);
+    charts.push(chart);
     chart.chart.rangeChanged = function(from, to) {
       syncRanges(from, to, chart);
     };
@@ -541,7 +621,74 @@ function ChartsPanel(getUrl) {
   me.onPanelMoved = undefined;
 };
 
-function ChartsWorkspace(urlProvider) {
+function ChartSettings() {
+  var me = this,
+      popup = window.PopupService.createModalPopup(),
+      panel = centralWindow("Impostazioni Grafico"),
+      seriesPanel = document.createElement("div"),
+      seriesPanels = [],
+      titleField = new TextField("Titolo del grafico");
+
+  panel.appendChild(new FormLabel("Titolo").view);
+  panel.appendChild(titleField.view());
+  panel.appendChild(new FormLabel("Serie").view);
+  panel.appendChild(seriesPanel);
+  panel.appendChild(simpleLink("Applica", function() {
+    popup.hide();
+    save(me.graph);
+    me.done();
+  }));
+
+  panel.appendChild(simpleLink("Annulla", function() {
+    popup.hide();
+  }));
+  popup.element().appendChild(panel);
+
+  me.open = function(graph, done) {
+    me.graph = graph;
+    me.done = done;
+    load(graph);
+    popup.show();
+  }
+
+  function SeriePanel(id, deleteCallabck) {
+    this.id = id;
+    var span = document.createElement("span"),
+        view = document.createElement("div");
+
+    span.innerText = "Serie " + id;
+    view.appendChild(simpleLink("Elimina", deleteCallabck));
+    view.appendChild(span);
+
+    this.view = function() { return view; }
+  }
+
+  var load = function(graph) {
+    titleField.setValue(graph.name);
+    emptyContent(seriesPanel);
+    seriesPanels = [];
+    for ( var i = 0; i < graph.series.length; i++ ) {
+      (function(i) {
+        var p = new SeriePanel(graph.series[i], function() {
+          seriesPanel.removeChild(p.view());
+          seriesPanels.remove(p);
+        });
+        seriesPanels.push(p);
+        seriesPanel.appendChild(p.view());
+      })(i);
+    }
+  }
+
+  var save = function(graph) {
+    graph.name = titleField.value();
+    graph.series = [];
+    for ( var i = 0; i < seriesPanels.length; i++ ) {
+      graph.series.push(seriesPanels[i].id);
+    }
+  }
+}
+
+function ChartsWorkspace(workspacesRepository, urlProvider) {
   var me = this;
   var chartsPanel = new ChartsPanel(urlProvider.urlForSerie);
   var view = document.createElement("div"),
@@ -549,6 +696,7 @@ function ChartsWorkspace(urlProvider) {
     workspace = {},
     timeControlBar = new TimeControlBar(chartsPanel.setTimeRange, chartsPanel.getTimeRange),
     dirty = false,
+    settings = new ChartSettings(),
     beforeunload = function() {
       if ( dirty )
     	  return 'confirm please';
@@ -570,6 +718,17 @@ function ChartsWorkspace(urlProvider) {
     workspace.data.graphs.move(from, to);
     markDirty();
     me.save();
+  };
+
+  chartsPanel.onEdit = function(idx, refresh) {
+    var chart = workspace.data.graphs[idx],
+    done = function() {
+      refresh(chart.series, chart.name);
+      markDirty();
+      me.save();
+    };
+
+    settings.open(chart, done);
   };
 
   me.view = function() {
@@ -614,8 +773,8 @@ function ChartsWorkspace(urlProvider) {
   me.load = function(id) {
     if ( dirty && !confirmLoseData() )
       return false;
-    $.getJSON(urlProvider.workspace(id), function(w) {
-      workspace = w || { data: { graphs:[] } };
+    workspacesRepository.get(id, function(w) {
+      workspace = w;
       dirty = false;
       refreshGraphs();
       if(workspace.data.timeRange != undefined) {
@@ -643,7 +802,7 @@ function ChartsWorkspace(urlProvider) {
   }
 }
 
-function WorkspacesPanel(workspaceRepository, urlProvider, searchPanel) {
+function WorkspacesPanel(workspacesRepository, urlProvider, searchPanel) {
   var me = this,
       view = document.createElement("div"),
       workspaceSelect = document.createElement("select"),
@@ -655,9 +814,9 @@ function WorkspacesPanel(workspaceRepository, urlProvider, searchPanel) {
   view.appendChild(workspaceSelect);
   view.appendChild(workspacePanel);
 
-  var chartsWorkspace = new ChartsWorkspace(urlProvider);
+  var chartsWorkspace = new ChartsWorkspace(workspacesRepository, urlProvider);
 
-  workspaceRepository.addListener({
+  workspacesRepository.addListener({
     refreshed: function() { populateWorkspaceSelect(); }
   });
 
@@ -671,9 +830,9 @@ function WorkspacesPanel(workspaceRepository, urlProvider, searchPanel) {
     o.value = -1;
     o.execute = mustOpenSearch;
     workspaceSelect.appendChild(o);
-    for(var i = 0; i < workspaceRepository.items.length; i++) {
+    for(var i = 0; i < workspacesRepository.items.length; i++) {
       (function(i) {
-        var item = workspaceRepository.items[i];
+        var item = workspacesRepository.items[i];
         var o = document.createElement("option");
         o.innerHTML = item.name;
         o.value = item.id;
@@ -709,8 +868,6 @@ function WorkspacesPanel(workspaceRepository, urlProvider, searchPanel) {
     return indexForOptionWithValue(workspaceSelect, workspace);
   }
 
-  populateWorkspaceSelect();
-
   me.view = function() { return view; }
 
   me.openWorkspace = function(workspace) {
@@ -724,41 +881,6 @@ function WorkspacesPanel(workspaceRepository, urlProvider, searchPanel) {
       return false;
     }
   }
-}
-
-function WorkspaceRepository(urlProvider) {
-  var me = this,
-      listeners = [],
-      noitfyListeners = function() {
-        for(var i = 0; i < listeners.length; i++) {
-          listeners[i].refreshed();
-        }
-      };
-
-  me.addListener = function(listener) {
-    listeners.push(listener);
-  };
-
-  me.reload = function() {
-    me.items = [];
-    $.getJSON(urlProvider.workspacesList(), function(data) {
-      me.items = data;
-      noitfyListeners();
-    });
-  }
-
-  me.create = function(cb) {
-    $.post(urlProvider.save_workspace(), {
-        data: { name: "WS " + new Date() }
-      }, function(d){
-      me.items.push(d);
-      noitfyListeners();
-      cb(d);
-    });
-  }
-
-  me.items = [];
-  me.reload();
 }
 
 window.GCComponents["FeatureChart.Ready"] = [];
@@ -917,7 +1039,7 @@ function SearchPanel(urlProvider) {
   searchForm.onSubmit = me.execute;
 }
 
-function AddSerieToWorkspace(workspaceRepository, urlProvider, serie, doneCallback, cancelCallback) {
+function AddSerieToWorkspace(workspacesRepository, urlProvider, serie, doneCallback, cancelCallback) {
   var me = this,
       view = centralWindow("Aggiungi a workspce");
 
@@ -937,17 +1059,23 @@ function AddSerieToWorkspace(workspaceRepository, urlProvider, serie, doneCallba
     var o = document.createElement("option");
     o.innerHTML = "[Nuovo grafico]";
     chartSelect.appendChild(o);
-    o.execute = function() { me.chartId = null; };
+    o.execute = function() {
+      me.chartId = null;
+      return true;
+    };
 
-    if(me.workspace) {
-      $.getJSON(urlProvider.workspace(me.workspace.id), function(w) {
+    if(me.workspace && me.workspace.id) {
+      workspacesRepository.get(me.workspace.id, function(w) {
         for(var i = 0; i < w.data.graphs.length; i++) {
           (function(i) {
             var o = document.createElement("option"),
                 item = w.data.graphs[i];
             o.innerHTML = item.name;
             chartSelect.appendChild(o);
-            o.execute = function() { me.chartId = item.id; }
+            o.execute = function() {
+              me.chartId = item.id;
+              return true;
+            }
           })(i);
         }
       });
@@ -958,15 +1086,23 @@ function AddSerieToWorkspace(workspaceRepository, urlProvider, serie, doneCallba
   var o = document.createElement("option");
   o.innerHTML = "[Nuovo workspace]";
   workspaceSelect.appendChild(o);
-  o.execute = function() { me.workspace = {} ; reloadCharts(); };
+  o.execute = function() {
+    me.workspace = {};
+    reloadCharts();
+    return true;
+  };
 
-  for(var i = 0; i < workspaceRepository.items.length; i++) {
+  for(var i = 0; i < workspacesRepository.items.length; i++) {
     (function(i) {
-      var item = workspaceRepository.items[i];
+      var item = workspacesRepository.items[i];
       var o = document.createElement("option");
       o.innerHTML = item.name;
       workspaceSelect.appendChild(o);
-      o.execute = function() { me.workspace = item; reloadCharts(); };
+      o.execute = function() {
+        me.workspace = item;
+        reloadCharts();
+        return true;
+      };
     })(i);
   }
 
@@ -975,9 +1111,9 @@ function AddSerieToWorkspace(workspaceRepository, urlProvider, serie, doneCallba
   me.view = view;
 }
 
-function popupAddSerieToWorkspace(workspaceRepository, urlProvider, serie, doneCallback) {
+function popupAddSerieToWorkspace(workspacesRepository, urlProvider, serie, doneCallback) {
   var popup = window.PopupService.createModalPopup(),
-      content = new AddSerieToWorkspace(workspaceRepository, urlProvider, serie, function(workspace, chartId) {
+      content = new AddSerieToWorkspace(workspacesRepository, urlProvider, serie, function(workspace, chartId) {
         popup.hide();
         doneCallback(serie, workspace, chartId);
       }, function(){
@@ -988,34 +1124,41 @@ function popupAddSerieToWorkspace(workspaceRepository, urlProvider, serie, doneC
   popup.show();
 }
 
-function installAddSerieToWorkspace(workspacesPopup, workspacesPanel, urlProvider, workspaceRepository) {
+function installAddSerieToWorkspace(workspacesPopup, workspacesPanel, urlProvider, workspacesRepository) {
   var addSerie = function(serie, workspace, chartId, callback) {
-      $.getJSON(urlProvider.workspace(workspace.id), function(w) {
-        var graphs = w.data['graphs'] || {};
+      workspacesRepository.get(workspace.id, function(w) {
+        var graphs = w.data['graphs'];
         var graph = findBy('id', graphs, chartId)
         if ( !graph ) {
           graph = { id: uid(8), series: [], name: serie.name };
           graphs.push(graph);
         }
-        graph.series.push(serie.id);
-        w.graphs = graphs;
-        $.post(urlProvider.save_workspace(w.id),
-          { data: w },
-          callback
-        );
+        if ( graph.series.indexOf(serie.id) == -1 ){
+          graph.series.push(serie.id);
+          w.graphs = graphs;
+          $.post(urlProvider.save_workspace(w.id),
+            { data: w },
+            callback
+          );
+        }
+        else {
+          callback();
+        }
       });
   },
   processData = function(serie, workspace, chartId) {
-    var callback = function() {
-      workspacesPopup.show();
-      workspacesPanel.openWorkspace(workspace);
-    };
     if ( workspace.id == undefined )
-      workspaceRepository.create(function(workspace){
-        addSerie(serie, workspace, chartId, callback);
+      workspacesRepository.create(function(new_workspace){
+        addSerie(serie, new_workspace, chartId, function() {
+          workspacesPopup.show();
+          workspacesPanel.openWorkspace(new_workspace);
+        });
       });
     else {
-      addSerie(serie, workspace, chartId, callback);
+      addSerie(serie, workspace, chartId, function() {
+        workspacesPopup.show();
+        workspacesPanel.openWorkspace(workspace);
+      });
     }
   };
 
@@ -1023,14 +1166,14 @@ function installAddSerieToWorkspace(workspacesPopup, workspacesPanel, urlProvide
   window.GCComponents["FeatureChart.Ready"].push(function(popup, chart, getSerie) {
     chart.toolbar.add("...", function() {
       var serie = getSerie();
-      popupAddSerieToWorkspace(workspaceRepository, urlProvider, serie, processData);
+      popupAddSerieToWorkspace(workspacesRepository, urlProvider, serie, processData);
     });
   });
 
   window.GCComponents["SearchChart.Ready"].push(function(chart, getSerie) {
     chart.toolbar.add("...", function() {
       var serie = getSerie();
-      popupAddSerieToWorkspace(workspaceRepository, urlProvider, serie, processData);
+      popupAddSerieToWorkspace(workspacesRepository, urlProvider, serie, processData);
     });
   });
 }
@@ -1068,12 +1211,12 @@ $(function(){
     }
   }
 
-  var workspaceRepository = new WorkspaceRepository(urlProvider);
+  var workspacesRepository = new WorkspacesRepository(urlProvider);
   var workspacesPopup = createFullWindownBlackPanelWithCloseAndContent();
-  var workspacesPanel = new WorkspacesPanel(workspaceRepository, urlProvider,
+  var workspacesPanel = new WorkspacesPanel(workspacesRepository, urlProvider,
     new SearchPanel(urlProvider));
 
   new FeatureButton(urlProvider);
   installSideBarButton(workspacesPanel, workspacesPopup);
-  installAddSerieToWorkspace(workspacesPopup, workspacesPanel, urlProvider, workspaceRepository);
+  installAddSerieToWorkspace(workspacesPopup, workspacesPanel, urlProvider, workspacesRepository);
 });

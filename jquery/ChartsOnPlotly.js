@@ -27,6 +27,7 @@ Chart = function(getChartData, opts) {
   var layout = {
     autosize: true,
     height: height(),
+    showlegend: !!opts['forcelegend'],
     margin: {l: 80, r: 30, b: 40, t: 20},
     xaxis: {
       type: "date"
@@ -37,6 +38,7 @@ Chart = function(getChartData, opts) {
 
 
   me.setIds = function(ids) {
+    ids = ids || [];
     this.ids = ids;
     var data = ids.map(function(id){ return {x: [], y: [], type: 'scatter'}; });
     Plotly.newPlot(view, data, layout, {showLink: false, displayModeBar: false});
