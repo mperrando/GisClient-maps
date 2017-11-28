@@ -49,8 +49,12 @@ Chart = function(getChartData, opts) {
           to = eventdata['xaxis.range[1]'],
           autorange = !!eventdata['xaxis.autorange'];
         if(autorange || from || to) {
-          from  = new Date(from).getTime();
-          to  = new Date(to).getTime();
+          from = view._fullLayout.xaxis.r2c(from);
+          to  = view._fullLayout.xaxis.r2c(to);
+          // correction due to the fact that Plotly does not support time zones
+          var offset = new Date().getTimezoneOffset() * 60000;
+          from += offset;
+          to += offset;
           me.rangeChanged(from || _from, to || _to);
         }
     });
