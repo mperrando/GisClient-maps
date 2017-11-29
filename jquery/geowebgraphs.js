@@ -307,7 +307,7 @@ function TimeControlBar(onChange, getCurrent) {
   view.appendChild(simpleLink("ADESSO", function() {
     var current = getCurrent(),
         from = current[0],
-        to = current[1]
+        to = current[1],
         span = to - from,
         now = new Date().getTime();
     onChange(now - span, now);
@@ -315,7 +315,7 @@ function TimeControlBar(onChange, getCurrent) {
   view.appendChild(simpleLink(">", function() {
     var current = getCurrent(),
         from = current[0],
-        to = current[1]
+        to = current[1],
         span = (to - from) / 2;
     onChange(from + span, to + span);
   }));
