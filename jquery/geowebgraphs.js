@@ -524,6 +524,9 @@ function ChartsPanel(getUrl) {
     var edit = chart.toolbar.add("...", function(){
       editChart(chart);
     });
+    var remove = chart.toolbar.add(" X ", function(){
+      removeChart(chart);
+    });
     return {
       calcVisibles: calcVisibles,
     }
@@ -562,6 +565,16 @@ function ChartsPanel(getUrl) {
         chart.setTitle(name);
         chart.refresh();
       });
+  }
+
+  var removeChart = function(chart) {
+    var idx = charts.indexOf(chart);
+    if ( me.onRemove ) {
+      me.onRemove(idx, function() {
+        charts.splice(idx, 1);
+        view.removeChild(chart.view);
+      });
+    }
   }
 
   var notifyPanelMoved = function(from, to) {
@@ -727,9 +740,20 @@ function ChartsWorkspace(workspacesRepository, urlProvider) {
       markDirty();
       me.save();
     };
-
     settings.open(chart, done);
   };
+
+  chartsPanel.onRemove = function(idx, proceed) {
+    var chart = workspace.data.graphs[idx],
+    done = function() {
+      proceed();
+      workspace.data.graphs.splice(idx, 1);
+      markDirty();
+      me.save();
+    }
+    if ( confirm("Delete this chart?") )
+      done();
+  }
 
   me.view = function() {
     return view;
