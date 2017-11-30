@@ -8,6 +8,23 @@ function findBy(key, array, value) {
   }
 }
 
+function indexBy(key, array, value) {
+  for ( var i = 0; i < array.length; i++) {
+    var item = array[i];
+    if ( item[key] == value )
+      return i;
+  }
+}
+
+function clean_nulls(obj) {
+  for (var propName in obj) {
+    if (obj[propName] === null || obj[propName] === undefined) {
+      delete obj[propName];
+    }
+  }
+  return obj;
+}
+
 function uid(groups) {
   function s4() {
     return Math.floor((1 + Math.random()) * 0x10000)
@@ -395,6 +412,16 @@ function WorkspacesRepository(urlProvider) {
       onReady(w);
     });
   }
+
+  me.delete = function(id, onDone) {
+    $.post(urlProvider.delete_workspace(id),
+      {},
+      function() {
+        me.items.splice(indexBy('id', me.items, id), 1);
+        noitfyListeners();
+        onDone();
+      });
+  }
 }
 
 /******************************************/
@@ -723,6 +750,9 @@ function ChartsWorkspace(workspacesRepository, urlProvider) {
   view.appendChild(titleBar);
   // ora abbiamo save automatico var saveBtn = simpleLink("Save", function() { me.save(); }),
   // titleBar.appendChild(saveBtn);
+
+  var deleteBtn = simpleLink(" X ", function() { if ( me.onDestroy ) me.onDestroy(); });
+  titleBar.appendChild(deleteBtn);
   view.appendChild(chartsPanel.view());
 
   chartsPanel.rangeChanged = chartsPanel.setTimeRange;
@@ -794,8 +824,12 @@ function ChartsWorkspace(workspacesRepository, urlProvider) {
     return confirm("Procedendo si perdono i dati non salvati. Procedere?");
   };
 
+  me.confirmIfDirty = function() {
+    return !dirty || confirmLoseData();
+  }
+
   me.load = function(id) {
-    if ( dirty && !confirmLoseData() )
+    if ( !me.confirmIfDirty() )
       return false;
     workspacesRepository.get(id, function(w) {
       workspace = w;
@@ -812,7 +846,7 @@ function ChartsWorkspace(workspacesRepository, urlProvider) {
     if ( !dirty)
       return;
     $.post(urlProvider.save_workspace(workspace.id),
-      { data: workspace }, markClean
+      { data: clean_nulls(workspace) }, markClean
     );
   }
 
@@ -830,7 +864,8 @@ function WorkspacesPanel(workspacesRepository, urlProvider, searchPanel) {
   var me = this,
       view = document.createElement("div"),
       workspaceSelect = document.createElement("select"),
-      workspacePanel = document.createElement("div");
+      workspacePanel = document.createElement("div"),
+      currentWorkspace;
 
   $(workspacePanel).addClass("workspaces");
   $(view).css("padding", 20);
@@ -839,6 +874,12 @@ function WorkspacesPanel(workspacesRepository, urlProvider, searchPanel) {
   view.appendChild(workspacePanel);
 
   var chartsWorkspace = new ChartsWorkspace(workspacesRepository, urlProvider);
+  chartsWorkspace.onDestroy = function() {
+    if ( !confirm("Stai eliminando questo workspace. Procedere?") )
+      return;
+    workspacesRepository.delete(currentWorkspace.id, function(){
+    });
+  }
 
   workspacesRepository.addListener({
     refreshed: function() { populateWorkspaceSelect(); }
@@ -865,8 +906,13 @@ function WorkspacesPanel(workspacesRepository, urlProvider, searchPanel) {
       })(i);
     }
     if ( currentValue != undefined ) {
-      workspaceSelect.selectedIndex =
-        indexOfOption(workspaceSelect, function(o) { return o.value == currentValue; });
+      var i = indexOfOption(workspaceSelect, function(o) { return o.value == currentValue; });
+      if ( i > -1 ) {
+        workspaceSelect.selectedIndex = i;
+      }
+      else {
+        workspaceSelect.selectedIndex = 0;
+      }
     }
     installCallbackOnOptions(workspaceSelect);
   };
@@ -881,6 +927,7 @@ function WorkspacesPanel(workspacesRepository, urlProvider, searchPanel) {
   }
 
   var mustChangeWorkspace = function(workspace) {
+    currentWorkspace = workspace;
     if(!chartsWorkspace.load(workspace.id))
       return false;
     emptyContent(workspacePanel);
@@ -1161,7 +1208,7 @@ function installAddSerieToWorkspace(workspacesPopup, workspacesPanel, urlProvide
           graph.series.push(serie.id);
           w.graphs = graphs;
           $.post(urlProvider.save_workspace(w.id),
-            { data: w },
+            { data: clean_nulls(w) },
             callback
           );
         }
@@ -1219,6 +1266,11 @@ $(function(){
       var url = servicesUrl + '/charts/?action=save_workspace';
       if ( id != undefined)
         url += '&id=' + id;
+      return url;
+    },
+
+    delete_workspace: function(id) {
+      var url = servicesUrl + '/charts/?action=delete_workspace&id=' + id;
       return url;
     },
 
