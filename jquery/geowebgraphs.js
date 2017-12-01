@@ -402,14 +402,22 @@ function WorkspacesRepository(urlProvider) {
   me.items = [];
   me.reload();
 
-  me.get = function(id, onReady) {
+  me.get = function(id, onDone) {
     $.getJSON(urlProvider.workspace(id), function(w) {
       w = w || {};
       w.data = w.data || {};
       w.data.graphs = w.data.graphs || [];
       for ( var i = 0; i < w.data.graphs.length; i++ )
         w.data.graphs[i].series = w.data.graphs[i].series || [];
-      onReady(w);
+      onDone(w);
+    });
+  }
+
+  me.update = function(workspace, onDone) {
+    $.post(urlProvider.save_workspace(workspace.id), {
+      data:  clean_nulls(workspace)
+    }, function(updated_workspace) {
+      onDone(updated_workspace);
     });
   }
 
@@ -559,6 +567,12 @@ function ChartsPanel(getUrl) {
     }
   }
 
+  var nullToolbar = function() {
+    return {
+      calcVisibles: function(){},
+    }
+  }
+
   var moveDown = function(chart) {
     var idx = charts.indexOf(chart);
     if ( idx == charts.length - 1 )
@@ -628,8 +642,13 @@ function ChartsPanel(getUrl) {
     chart.chart.rangeChanged = function(from, to) {
       syncRanges(from, to, chart);
     };
-    chart.moveToolbar = createToolbar(chart);
-    eachChartDo(function(c){
+    if ( chart.owned ) {
+      chart.moveToolbar = createToolbar(chart);
+    }
+    else {
+      chart.moveToolbar = nullToolbar();
+    }
+    eachChartDo(function(c) {
       c.moveToolbar.calcVisibles();
     });
     chart.rangeChanged = rangeChangedOnChart;
@@ -753,6 +772,10 @@ function ChartsWorkspace(workspacesRepository, urlProvider) {
 
   var deleteBtn = simpleLink(" X ", function() { if ( me.onDestroy ) me.onDestroy(); });
   titleBar.appendChild(deleteBtn);
+
+  var editBtn = simpleLink("...", function() { if ( me.onEdit ) me.onEdit(); });
+  titleBar.appendChild(editBtn);
+
   view.appendChild(chartsPanel.view());
 
   chartsPanel.rangeChanged = chartsPanel.setTimeRange;
@@ -806,6 +829,11 @@ function ChartsWorkspace(workspacesRepository, urlProvider) {
       chartsPanel.addChart(graphs[i].series, graphs[i].name);
     }
   },
+  refreshToolbar = function() {
+    var display = workspace.owned ? 'inline' : 'none';
+    $(deleteBtn).css('display', display);
+    $(editBtn).css('display', display);
+  },
   markDirty = function() {
     dirty = true;
     calcCss();
@@ -835,6 +863,7 @@ function ChartsWorkspace(workspacesRepository, urlProvider) {
       workspace = w;
       dirty = false;
       refreshGraphs();
+      refreshToolbar();
       if(workspace.data.timeRange != undefined) {
         chartsPanel.setTimeRange(timeRange.from, timeRange.to);
       }
@@ -845,9 +874,7 @@ function ChartsWorkspace(workspacesRepository, urlProvider) {
   me.save = function() {
     if ( !dirty)
       return;
-    $.post(urlProvider.save_workspace(workspace.id),
-      { data: clean_nulls(workspace) }, markClean
-    );
+    workspacesRepository.update(workspace, markClean);
   }
 
   me.clear = function() {
@@ -860,12 +887,49 @@ function ChartsWorkspace(workspacesRepository, urlProvider) {
   }
 }
 
+function WorkspaceSettings() {
+  var me = this,
+      popup = window.PopupService.createModalPopup(),
+      panel = centralWindow("Impostazioni Workspace"),
+      titleField = new TextField("Titolo");
+
+  panel.appendChild(new FormLabel("Titolo").view);
+  panel.appendChild(titleField.view());
+
+  panel.appendChild(simpleLink("Applica", function() {
+    popup.hide();
+    save(me.workspace);
+    me.done();
+  }));
+
+  panel.appendChild(simpleLink("Annulla", function() {
+    popup.hide();
+  }));
+  popup.element().appendChild(panel);
+
+  me.open = function(workspace, done) {
+    me.workspace = workspace;
+    me.done = done;
+    load(workspace);
+    popup.show();
+  }
+
+  function load(w) {
+    titleField.setValue(w.name);
+  }
+
+  function save(w) {
+    w.name = titleField.value();
+  }
+}
+
 function WorkspacesPanel(workspacesRepository, urlProvider, searchPanel) {
   var me = this,
       view = document.createElement("div"),
       workspaceSelect = document.createElement("select"),
       workspacePanel = document.createElement("div"),
-      currentWorkspace;
+      currentWorkspaceId,
+      settings = new WorkspaceSettings();
 
   $(workspacePanel).addClass("workspaces");
   $(view).css("padding", 20);
@@ -877,7 +941,17 @@ function WorkspacesPanel(workspacesRepository, urlProvider, searchPanel) {
   chartsWorkspace.onDestroy = function() {
     if ( !confirm("Stai eliminando questo workspace. Procedere?") )
       return;
-    workspacesRepository.delete(currentWorkspace.id, function(){
+    workspacesRepository.delete(currentWorkspaceId, function(){
+    });
+  }
+
+  chartsWorkspace.onEdit = function() {
+    workspacesRepository.get(currentWorkspaceId, function(w) {
+      settings.open(w, function(){
+        workspacesRepository.update(w, function(w) {
+          workspaceSelect.options[workspaceSelect.selectedIndex].innerHTML = w.name;
+        });
+      });
     });
   }
 
@@ -900,6 +974,8 @@ function WorkspacesPanel(workspacesRepository, urlProvider, searchPanel) {
         var item = workspacesRepository.items[i];
         var o = document.createElement("option");
         o.innerHTML = item.name;
+        if ( item.owned && item.public )
+          o.innerHTML += ' [PUBLIC]';
         o.value = item.id;
         workspaceSelect.appendChild(o);
         o.execute = function(o) { return mustChangeWorkspace(item); }
@@ -927,7 +1003,7 @@ function WorkspacesPanel(workspacesRepository, urlProvider, searchPanel) {
   }
 
   var mustChangeWorkspace = function(workspace) {
-    currentWorkspace = workspace;
+    currentWorkspaceId = workspace.id;
     if(!chartsWorkspace.load(workspace.id))
       return false;
     emptyContent(workspacePanel);
@@ -1166,6 +1242,8 @@ function AddSerieToWorkspace(workspacesRepository, urlProvider, serie, doneCallb
   for(var i = 0; i < workspacesRepository.items.length; i++) {
     (function(i) {
       var item = workspacesRepository.items[i];
+      if ( !item.owned )
+        return;
       var o = document.createElement("option");
       o.innerHTML = item.name;
       workspaceSelect.appendChild(o);
@@ -1206,11 +1284,7 @@ function installAddSerieToWorkspace(workspacesPopup, workspacesPanel, urlProvide
         }
         if ( graph.series.indexOf(serie.id) == -1 ){
           graph.series.push(serie.id);
-          w.graphs = graphs;
-          $.post(urlProvider.save_workspace(w.id),
-            { data: clean_nulls(w) },
-            callback
-          );
+          workspacesRepository.update(w, callback);
         }
         else {
           callback();
@@ -1235,6 +1309,8 @@ function installAddSerieToWorkspace(workspacesPopup, workspacesPanel, urlProvide
 
 
   window.GCComponents["FeatureChart.Ready"].push(function(popup, chart, getSerie) {
+    if (!GisClientMap.logged_username)
+      return;
     chart.toolbar.add("...", function() {
       var serie = getSerie();
       popupAddSerieToWorkspace(workspacesRepository, urlProvider, serie, processData);
@@ -1242,6 +1318,8 @@ function installAddSerieToWorkspace(workspacesPopup, workspacesPanel, urlProvide
   });
 
   window.GCComponents["SearchChart.Ready"].push(function(chart, getSerie) {
+    if (!GisClientMap.logged_username)
+      return;
     chart.toolbar.add("...", function() {
       var serie = getSerie();
       popupAddSerieToWorkspace(workspacesRepository, urlProvider, serie, processData);
